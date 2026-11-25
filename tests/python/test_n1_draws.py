@@ -138,3 +138,33 @@ def test_a_batch_records_and_forces_per_battle():
         forced.set_forced_draws(0, as_tuples(row["draws"][2 + k]))
         forced.choose([(0, NAMES.index(c["player"]), c["choice"])])
         assert forced.take_draws(0) == as_tuples(row["draws"][2 + k])
+
+
+def test_reseed_replaces_the_generator_and_keeps_the_draw_log_and_the_forced_draws():
+    """`reseed` is for drawing other outcomes from a copy; it used to drop recording and forcing with the generator."""
+    row = battles()[0]
+    # the first choice whose write draws anything in Showdown: the turn that first needs the generator
+    k = next(i for i in range(len(row["choices"])) if row["draws"][2 + i])
+    queue = as_tuples(row["draws"][2 + k])
+
+    def play_to_k(battle):
+        for c in row["choices"][:k]:
+            battle.choose(c["player"], c["choice"])
+        battle.take_draws()
+
+    mine = ninjask.Battle.reference(
+        dex(), row["packed"]["p1"], row["packed"]["p2"], row["seed"], names=NAMES, record_draws=True
+    )
+    play_to_k(mine)
+    mine.reseed(7)
+    mine.choose(row["choices"][k]["player"], row["choices"][k]["choice"])
+    assert mine.take_draws() != [], "the log stays on after a reseed"
+
+    forced = ninjask.Battle(
+        dex(), row["packed"]["p1"], row["packed"]["p2"], 12345, names=NAMES, forced_draws=start_draws(row)
+    )
+    play_to_k(forced)
+    forced.set_forced_draws(queue)
+    forced.reseed(99)
+    forced.choose(row["choices"][k]["player"], row["choices"][k]["choice"])
+    assert forced.take_draws() == queue, "the forced draws stay in force after a reseed"

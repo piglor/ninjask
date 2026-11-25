@@ -571,15 +571,27 @@ impl Batch {
                     .ok_or_else(|| format!("battle {i} was never reset"))?;
                 mine.iter()
                     .map(|&(k, s, index)| {
-                        let list = match &mut env.channel {
-                            Some(channel) => channel.candidates(s).map(<[Candidate]>::to_vec),
-                            None => env.battle.candidates(s),
-                        }
-                        .map_err(|e| format!("battle {i} side {s}: {e}"))?;
-                        let choice = list.get(index).ok_or_else(|| {
-                            format!("battle {i} side {s}: candidate {index} of {}", list.len())
-                        })?;
-                        Ok((k, s, choice.choice.clone()))
+                        // Only the picked choice is copied, never the list: with
+                        // channels the list is the channel's own (kept for the
+                        // request), without them it is built here and dropped.
+                        let pick = |list: &[Candidate]| {
+                            list.get(index).map(|c| c.choice.clone()).ok_or_else(|| {
+                                format!("battle {i} side {s}: candidate {index} of {}", list.len())
+                            })
+                        };
+                        let text = match &mut env.channel {
+                            Some(channel) => pick(
+                                channel
+                                    .candidates(s)
+                                    .map_err(|e| format!("battle {i} side {s}: {e}"))?,
+                            ),
+                            None => pick(
+                                &env.battle
+                                    .candidates(s)
+                                    .map_err(|e| format!("battle {i} side {s}: {e}"))?,
+                            ),
+                        }?;
+                        Ok((k, s, text))
                     })
                     .collect()
             })

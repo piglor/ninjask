@@ -121,7 +121,8 @@ class Battle:
         """Lines `start..` of a channel, `viewer` "p1" or "p2" (the stream Showdown sends that
         player: the log as they see it, each `|request|` where Showdown sends it, a wait request for
         the side with nothing to choose, `|error|` lines for refused choices, no `rqid`) or
-        "omniscient" (the log with both sides' secrets, no requests). Needs `channels=True`."""
+        "omniscient" (the log with both sides' secrets, no requests; evaluation only, never a policy's
+        input). Needs `channels=True`."""
     def channel_len(self, viewer: str) -> int:
         """The number of lines of a channel."""
     def discard_channel(self, viewer: str, upto: int) -> None:
@@ -138,11 +139,16 @@ class Battle:
         player whether the choice is legal, so the engine may refuse it. Empty for a side that only
         waits. ValueError for a request with a field the enumerator does not know."""
     def chosen(self, side: str) -> str | None:
-        """The choice the side has made and not yet had run, in the engine's own spelling."""
+        """The choice the side has made and not yet had run, in the engine's own spelling.
+
+        Evaluation only: the other side's pending choice is hidden information, and so is everything
+        else the engine knows that a player's channel does not carry."""
     def take_draws(self) -> list[Draw]:
         """The random draws made since the last call, `(method, args, result)` as Showdown's PRNG
         calls (`random`, `randomChance`, `sample`, `shuffle`), each with the result used. Needs
-        `record_draws=True` or `set_forced_draws`."""
+        `record_draws=True` or `set_forced_draws`.
+
+        Evaluation only: the draws are what the player cannot know (a crit, a hit, a roll, a tie)."""
     def set_forced_draws(self, draws: list[Draw]) -> None:
         """Answer the next draws from a list: the n-th call made from now on takes the result of the
         n-th entry when its method and arguments are the entry's, else the generator's own. Starts
@@ -188,11 +194,14 @@ class Battle:
     def log_len(self) -> int: ...
     def set_logging(self, on: bool) -> None: ...
     def show_team_sheets(self) -> None:
-        """Open team sheets: log both teams' sets, as Showdown does at team preview."""
+        """Open team sheets: log both teams' sets, as Showdown does at team preview.
+
+        Evaluation only for a format with closed sheets: it writes the opponent's sets into the log."""
     def projection(self) -> str:
         """The full state as JSON, in the shape of the reference harness's projection."""
     def copy(self) -> Battle: ...
-    def reseed(self, seed: int) -> None: ...
+    def reseed(self, seed: int) -> None:
+        """Replace the generator with the fast one of `seed`. The draw log (`record_draws`) and forced draws stay."""
     def damage(self, attacker: str, move_id: str, target: str) -> str:
         """The damage calculation for a move from slot `attacker` against slot `target`, as JSON."""
     def order(self, a: str, plan_a: str, b: str, plan_b: str) -> tuple[float, float]:
@@ -290,14 +299,14 @@ class Batch:
     def candidates(self, i: int, side: int | str) -> list[tuple[str, bool]]:
         """The candidates of the side's current request in battle `i` (see `Battle.candidates`)."""
     def channel(self, i: int, viewer: str, start: int = 0) -> list[str]:
-        """Lines `start..` of a channel of battle `i` (see `Battle.channel`)."""
+        """Lines `start..` of a channel of battle `i` (see `Battle.channel`; "omniscient" is evaluation only)."""
     def channel_len(self, i: int, viewer: str) -> int: ...
     def discard_channel(self, i: int, viewer: str, upto: int) -> None:
         """Forget the lines of a channel of battle `i` before line `upto` (see `Battle.discard_channel`)."""
     def request_hash(self, i: int, side: int | str) -> str | None:
         """The identity of the side's current request in battle `i` (see `Battle.request_hash`)."""
     def take_draws(self, i: int) -> list[Draw]:
-        """The draws battle `i` made since the last call (see `Battle.take_draws`)."""
+        """The draws battle `i` made since the last call (see `Battle.take_draws`). Evaluation only."""
     def set_forced_draws(self, i: int, draws: list[Draw]) -> None:
         """Force the next draws of battle `i` (see `Battle.set_forced_draws`)."""
     def observe(self) -> Observation:

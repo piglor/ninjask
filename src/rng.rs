@@ -97,12 +97,15 @@ impl Call {
             (Call::RandomRange(a, b), Outcome::Int(r)) => (a..b).contains(&r),
             (Call::Chance(..) | Call::ChanceF(..), Outcome::Bool(_)) => true,
             (Call::Shuffle { len, .. }, Outcome::Perm(p)) => {
-                let mut seen = vec![false; *len as usize];
-                p.len() == *len as usize
-                    && p.iter().all(|&i| {
-                        seen.get_mut(i as usize)
-                            .is_some_and(|s| !std::mem::replace(s, true))
-                    })
+                // The length first: a recorded list that names a huge `len` must not allocate.
+                if p.len() != *len as usize {
+                    return false;
+                }
+                let mut seen = vec![false; p.len()];
+                p.iter().all(|&i| {
+                    seen.get_mut(i as usize)
+                        .is_some_and(|s| !std::mem::replace(s, true))
+                })
             }
             _ => false,
         }
@@ -417,6 +420,13 @@ fn chacha20_block(key: &[u8; 32]) -> [u8; 64] {
 
 impl Rng {
     /// Fast mode: xoshiro256++ from a 64-bit seed.
+    /// Replaces the generator with the fast one of `seed` and nothing else:
+    /// the draw log and the forced draws stay (a forced draw is still
+    /// answered first), as does a trace.
+    pub fn reseed(&mut self, seed: u64) {
+        self.gen = Rng::new(seed).gen;
+    }
+
     pub fn new(seed: u64) -> Rng {
         let mut st = seed;
         let state = [

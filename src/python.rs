@@ -731,8 +731,10 @@ impl PyBattle {
     }
 
     /// Reseed the engine's RNG (for drawing independent outcomes from a copy).
+    /// Only the generator is replaced (by the fast one): recorded draws and
+    /// forced draws stay as they are.
     fn reseed(&mut self, seed: u64) {
-        self.inner.rng = crate::rng::Rng::new(seed);
+        self.inner.rng.reseed(seed);
     }
 
     /// The read-only damage calculation (`ninjask::calc`) for the move
