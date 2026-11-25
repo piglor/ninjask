@@ -10,6 +10,7 @@ for a pin bump.
 
     python scripts/repin.py provenance check            # the exports and the sources are what the file says
     python scripts/repin.py provenance write            # after a deliberate pin bump or tool change
+    python scripts/repin.py provenance check-data DIR   # exports in DIR/format/ are the recorded ones (no Showdown needed)
     python scripts/repin.py diff-showdown OLD NEW       # commits and files between two pins, classified
     python scripts/repin.py diff-showdown OLD NEW --strict   # exit 1 if a mechanics or unreviewed file differs
     python scripts/repin.py diff-exports OLD.json NEW.json   # what changed in the exported data
@@ -162,7 +163,40 @@ def differences(want: dict, got: dict) -> list[str]:
     return out
 
 
+def check_data(directory: Path, record: dict, only: Sequence[str] = ()) -> list[str]:
+    """Where the exports in `directory/format/<id>.json` are not the ones `record` lists (a missing
+    file, another size or hash), one line each. A directory of exports made elsewhere (the build of a
+    project that vendors the engine) is held to the record this way, without a Showdown to export from;
+    files the record does not list are not its concern. `only` limits the check to those format ids."""
+    formats = record["export"]["formats"]
+    problems = [f"{name}: the record lists no such format" for name in only if name not in formats]
+    for name in sorted(formats if not only else [n for n in only if n in formats]):
+        path = directory / "format" / f"{name}.json"
+        if not path.is_file():
+            problems.append(f"{path}: missing")
+            continue
+        data = path.read_bytes()
+        want = formats[name]
+        if sha256(data) != want["sha256"] or len(data) != want["bytes"]:
+            problems.append(f"{path}: differs from the record (sha256 {sha256(data)[:12]}, {len(data)} bytes; recorded {want['sha256'][:12]}, {want['bytes']} bytes)")
+    return problems
+
+
+def cmd_check_data(args: argparse.Namespace) -> int:
+    record = load_provenance()
+    if record is None:
+        print(f"{PROVENANCE} is missing", file=sys.stderr)
+        return 1
+    problems = check_data(Path(args.directory), record, args.only or ())
+    for line in problems:
+        print(line)
+    print("provenance data: ok" if not problems else f"provenance data: {len(problems)} problem(s)")
+    return 1 if problems else 0
+
+
 def cmd_provenance(args: argparse.Namespace) -> int:
+    if args.action == "check-data":
+        return cmd_check_data(args)
     sources = source_files()
     if sources["commit"] != pin():
         print(f"the Showdown checkout is at {sources['commit']}, the pin is {pin()}: the record is of the pin only", file=sys.stderr)
@@ -388,8 +422,10 @@ def cmd_diff_exports(args: argparse.Namespace) -> int:
 def main(argv: Sequence[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
-    pr = sub.add_parser("provenance", help="write or check refsim/PROVENANCE.json")
-    pr.add_argument("action", choices=("write", "check"))
+    pr = sub.add_parser("provenance", help="write or check refsim/PROVENANCE.json, or check a directory of exports against it")
+    pr.add_argument("action", choices=("write", "check", "check-data"))
+    pr.add_argument("directory", nargs="?", help="check-data: the directory that holds format/<id>.json")
+    pr.add_argument("--only", action="append", metavar="FORMAT", help="check-data: only this format (repeatable)")
     pr.set_defaults(run=cmd_provenance)
     ds = sub.add_parser("diff-showdown", help="the commits and files between two Showdown commits, classified")
     ds.add_argument("old")
@@ -408,6 +444,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     de.add_argument("new")
     de.set_defaults(run=cmd_diff_exports)
     args = p.parse_args(argv)
+    if args.cmd == "provenance" and (args.action == "check-data") != (args.directory is not None):
+        p.error("`provenance check-data` takes the directory to check, and no other action does")
     return args.run(args)
 
 

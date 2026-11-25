@@ -33,7 +33,9 @@ Hardening after the review of the pin sync.
 - `ninjask.dex(id, data_dir=...)`, `ninjask.load(id, data_dir=...)` and `export_path(...,
   data_dir=...)`: load a format from a directory of exports (the layout of `$NINJASK_DATA`) in
   an installed wheel.
-- `refsim/source_files.js`, `scripts/repin.py diff-showdown --strict`, `--mod` and `--candidate`.
+- `refsim/source_files.js`, `scripts/repin.py diff-showdown --strict`, `--mod` and `--candidate`, and
+  `scripts/repin.py provenance check-data DIR` (a directory of exports made elsewhere, held to the
+  record without a Showdown).
 
 ### Fixed
 

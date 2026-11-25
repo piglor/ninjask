@@ -190,6 +190,14 @@ After the pull request is merged to the fork's `main`, the Areneon repository bu
 submodule to that commit; its pin test requires `vendor/ninjask/refsim/SHOWDOWN_COMMIT` to equal its own
 `vendor/pokemon-showdown` gitlink and the compiled `ninjask.SHOWDOWN_COMMIT` to equal both.
 
+A project that builds the engine as a wheel-style package (no source checkout around it) exports the
+formats from its own Showdown checkout at the pin, `NINJASK_SHOWDOWN=<its checkout> node
+refsim/export_format.js <id> > <dir>/format/<id>.json` for each format in `refsim/PROVENANCE.json`, and
+holds the directory to the record without exporting again: `python scripts/repin.py provenance check-data
+<dir>` (exit 1 on a missing, changed or resized export). The package then loads them with
+`NINJASK_DATA=<dir>` or `ninjask.dex(id, data_dir=<dir>)`, and the loader itself refuses an export that is
+not from the pin.
+
 ## What 0.4.1+areneon.0 found, for the next bump
 
 - A handler can change with its name unchanged: hashes of handler sources (`callbackHashes`) are in the
