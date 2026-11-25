@@ -153,3 +153,17 @@ def test_revival_blessing_and_a_faint_in_one_request():
         "pass, switch 1",
         "pass, switch 3",
     ]
+
+
+def test_two_reviving_slots_may_name_the_same_fainted_teammate():
+    # Showdown records no revival in `switchIns`: all nine combinations of two revivals and a pass are
+    # accepted (a forced pass is allowed for each, nobody lives on the bench), the same teammate twice
+    # included. Checked on the pin with two Pawmot.
+    req = {
+        "forceSwitch": [True, True],
+        **side(mon("R1", True, reviving=True), mon("R2", True, reviving=True), mon("C", hp="0 fnt"), mon("D", hp="0 fnt")),
+    }
+    assert sorted(joint_choices(req)) == sorted(f"{a}, {b}" for a in ("switch 3", "switch 4", "pass") for b in ("switch 3", "switch 4", "pass"))
+    # A normal switch still goes to one Pokémon at most.
+    plain = {"forceSwitch": [True, True], **side(mon("A", True, "0 fnt"), mon("B", True, "0 fnt"), mon("C"), mon("D"))}
+    assert sorted(joint_choices(plain)) == ["switch 3, switch 4", "switch 4, switch 3"]
