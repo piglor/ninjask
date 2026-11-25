@@ -33,15 +33,16 @@ impl Battle {
             .map(|f| ModHandler::new(0, self.mon(f).speed, 7))
             .collect();
         // The Pokémon's own volatiles (subOrder 2): partial trapping,
-        // Ingrain, `trapped`, No Retreat and Octolock. Their keys are all
+        // Ingrain, `trapped` (linked, or No Retreat's own) and Octolock.
+        // No Retreat's condition has no `onTrapPokemon` since Showdown
+        // d12b9c1e9: its `trapped` volatile is the trap. Their keys are all
         // equal, so their order doesn't change the sort's draws.
         let m = self.mon(r);
         let v = &m.vol;
         let own = [
             v.partial_trap > 0,
             v.ingrain,
-            v.trapped.is_some(),
-            v.no_retreat,
+            v.trapped.is_some() || v.trapped_free,
             v.octolock.is_some(),
         ];
         let mut all: Small<ModHandler> = smallvec::smallvec![ModHandler::new(0, m.speed, 2); own.iter().filter(|&&on| on).count()];
@@ -65,8 +66,7 @@ impl Battle {
             let calls = usize::from(
                 v.partial_trap > 0 && v.partial_trap_source.is_some_and(|s| self.source_active(s)),
             ) + usize::from(v.ingrain)
-                + usize::from(v.trapped.is_some())
-                + usize::from(v.no_retreat)
+                + usize::from(v.trapped.is_some() || v.trapped_free)
                 + usize::from(v.octolock.is_some_and(|s| self.mon(s).is_active))
                 + usize::from(self.field.fairy_lock > 0)
                 + if self.has_ability(r, AbilityKind::ShadowTag) {
@@ -88,7 +88,7 @@ impl Battle {
             && v.partial_trap_source.is_some_and(|s| self.source_active(s)))
             || v.ingrain
             || v.trapped.is_some()
-            || v.no_retreat
+            || v.trapped_free
             || v.octolock.is_some_and(|s| self.mon(s).is_active)
             || self.field.fairy_lock > 0;
         if !immune && traps {
@@ -147,7 +147,11 @@ impl Battle {
     /// immunity, silently). Then TryAddVolatile, the start, and the source's
     /// linked `trapper` (with its own TryAddVolatile when it is new).
     pub(crate) fn add_trapped(&mut self, t: MonRef, src: MonRef) -> bool {
-        if self.mon(t).hp == 0 || self.mon(src).hp == 0 || self.mon(t).vol.trapped.is_some() {
+        if self.mon(t).hp == 0
+            || self.mon(src).hp == 0
+            || self.mon(t).vol.trapped.is_some()
+            || self.mon(t).vol.trapped_free
+        {
             return false;
         }
         if self
@@ -165,6 +169,33 @@ impl Battle {
             self.try_add_volatile_sort(src);
         }
         self.mon_mut(src).vol.trapper |= Self::trap_bit(t);
+        true
+    }
+
+    /// `addVolatile('trapped')` with no source link, as No Retreat's start
+    /// calls it on its own user (Champions, Showdown d12b9c1e9): fails for a
+    /// Pokémon with no HP, one that already has the volatile (it has no
+    /// `onRestart`) and a Ghost (`trapped` immunity, silently: a No Retreat
+    /// move has no `status`, so no `-immune`). Then the Immunity event's
+    /// sort, `TryAddVolatile`, and the start's `-activate`. No `trapper`
+    /// volatile is linked.
+    pub(crate) fn add_trapped_free(&mut self, t: MonRef) -> bool {
+        if self.mon(t).hp == 0 || self.mon(t).vol.trapped.is_some() || self.mon(t).vol.trapped_free
+        {
+            return false;
+        }
+        if self
+            .types_of(t)
+            .iter()
+            .any(|&x| self.dex.type_immune_to_effect(x, "trapped"))
+        {
+            return false;
+        }
+        self.event_sort(crate::dex::events::Event::Immunity, t, None, &[]);
+        self.try_add_volatile_sort(t);
+        self.mon_mut(t).vol.trapped_free = true;
+        let ti = self.ident(t);
+        log_line!(self, "|-activate|{ti}|trapped");
         true
     }
 
@@ -192,6 +223,7 @@ impl Battle {
         }
         let v = &mut self.mon_mut(r).vol;
         v.trapped = None;
+        v.trapped_free = false;
         v.trapper = 0;
     }
 

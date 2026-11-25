@@ -406,6 +406,9 @@ impl Battle {
                     "trapped".into(),
                     json!({"linkedStatus": "trapper", "linked": [crate::projection::mref_id(t)]}),
                 );
+            } else if v.trapped_free {
+                // No Retreat's own `trapped`: nothing is linked.
+                out.insert("trapped".into(), json!({}));
             }
             if v.trapper != 0 {
                 let mut linked: Vec<String> = (0..16usize)
@@ -569,6 +572,8 @@ pub(crate) fn import_volatiles(vol: &mut Volatiles, vols: &Value, dex: &Dex) {
         v.trapped = vols["trapped"]["linked"]
             .get(0)
             .and_then(crate::projection::parse_mref);
+        // A `trapped` with no `linked` key is No Retreat's (nothing linked).
+        v.trapped_free = vols.get("trapped").is_some() && vols["trapped"].get("linked").is_none();
         for t in vols["trapper"]["linked"]
             .as_array()
             .into_iter()

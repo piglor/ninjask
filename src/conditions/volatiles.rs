@@ -192,12 +192,20 @@ impl Battle {
                 log_line!(self, "|-singleturn|{ti}|move: Electrify");
                 Some(true)
             }
+            // Champions' condition (Showdown d12b9c1e9): onStart adds the
+            // `trapped` volatile (`|-activate|..|trapped`) and, only if that
+            // worked, announces the start. It returns nothing otherwise, so
+            // the volatile stays: an already trapped or Ghost-type user has
+            // `noretreat` and prints nothing. Its onTry already failed a
+            // user that has it; the condition has no `onTrapPokemon`.
             "noretreat" => {
                 if self.mon(t).vol.no_retreat {
                     return Some(false);
                 }
                 self.mon_mut(t).vol.no_retreat = true;
-                log_line!(self, "|-start|{ti}|move: No Retreat");
+                if self.add_trapped_free(t) {
+                    log_line!(self, "|-start|{ti}|move: No Retreat");
+                }
                 Some(true)
             }
             // onStart swaps the stored Attack and Defense; onRestart removes
@@ -728,7 +736,9 @@ impl Battle {
         v.destiny_bond = false;
         v.attract = None;
         v.attract_source_gone = false;
+        // `trapped` is `noCopy`; `noretreat` is not, and traps no more by itself.
         v.trapped = None;
+        v.trapped_free = false;
         v.trapper = 0;
         v.lock_on = None;
         v.lock_on_duration = 0;
@@ -780,13 +790,6 @@ impl Battle {
             "octolock" => Some(self.add_octolock(t, src)),
             _ => None,
         }
-    }
-
-    /// No Retreat's onTry deletes the move's `volatileStatus` for a
-    /// Pokémon that is already `trapped`.
-    pub(crate) fn skip_volatile_status(&self, src: MonRef, mv: &Move) -> bool {
-        self.dex.move_kind[mv.idx as usize] == MoveKind::NoRetreat
-            && self.mon(src).vol.trapped.is_some()
     }
 
     /// A move's `self.volatileStatus` from this module: `lockedmove`
