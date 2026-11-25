@@ -153,19 +153,34 @@ drawn are unchanged.
 
 ## Cost
 
-Measured on one thread at `nice 19` on a shared workstation, not claimed to
-repeat. `examples/batch_bench` (256 battles, observation and choice per
-decision):
+Measured on one thread (`RAYON_NUM_THREADS=1`, pinned to a core, `nice 19`) on a shared
+workstation (load average 4 to 8), not claimed to repeat. Pool: 978 generated
+teams.
 
-| | decisions/s |
-|---|---|
-| before (evaluated commit) | see CHANGELOG |
-| after, integer seeds | see CHANGELOG |
+**The existing path did not slow down.** `examples/batch_bench` (random policy,
+every decision observed), the evaluated commit and this branch alternating, six
+runs each, decisions per second, medians:
 
-The channel path (no observations): one request per side per stop (built by
-`request_json`, written once), plus the candidates on demand. The Showdown
-generator costs one ChaCha20 block per draw, about the same on every call
-site.
+| battles in flight | evaluated commit | this branch | ratio |
+|---|---|---|---|
+| 64 | 57,999 | 57,969 | 0.999 |
+| 256 | 51,400 | 52,263 | 1.017 |
+| 1024 | 45,604 | 44,409 | 0.974 |
+
+(Run-to-run spread within one binary is about plus or minus 8%.)
+
+**Showdown seeds** cost about 3%: `batch_bench` with 256 battles, 54,400 to
+58,600 decisions/s with `sodium,<hex>` seeds against 56,400 to 59,400 with
+integer seeds. The generator is one ChaCha20 block per draw.
+
+**The channel path** (`examples/channel_bench`: candidates, a choice by index,
+both players' new lines read and discarded; no observation) plays about 12,000
+to 13,000 decisions/s with 256 battles in flight, with integer or Showdown seeds
+alike. Where the time goes (the engine's own step is about 11 us of the
+roughly 80 us a decision): building each side's request as a JSON value
+(about 36 us a request, two requests a stop), writing it, and storing it.
+A request written straight to text from the engine's state, without the JSON
+value, is the next step for this path.
 
 ## Known gaps (found by the corpus runs, not fixed here)
 
