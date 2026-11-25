@@ -60,10 +60,12 @@ fn main() {
     let mut policy = Rng::new(1);
     let mut seen = vec![[0usize; 3]; n];
     let (mut finished, mut decisions, mut lines) = (0usize, 0usize, 0usize);
+    let (mut t_cand, mut t_choose, mut t_read) = (0.0, 0.0, 0.0);
     let t0 = Instant::now();
     while finished < games {
         let pending = batch.pending();
         decisions += pending.len();
+        let t = Instant::now();
         let picks: Vec<(usize, usize, usize)> = pending
             .iter()
             .map(|&(i, s)| {
@@ -71,12 +73,19 @@ fn main() {
                 (i, s, policy.random(count) as usize)
             })
             .collect();
+        t_cand += t.elapsed().as_secs_f64();
+        let t = Instant::now();
         batch.choose_candidates(&picks).unwrap();
+        t_choose += t.elapsed().as_secs_f64();
+        let t = Instant::now();
         for &(i, s, _) in &picks {
             let new = batch.channel(i, s, seen[i][s]).unwrap();
             seen[i][s] += new.len();
             lines += new.len();
+            // what has been read is not kept
+            batch.discard_channel(i, s, seen[i][s]).unwrap();
         }
+        t_read += t.elapsed().as_secs_f64();
         for (i, read) in seen.iter_mut().enumerate() {
             if batch.done(i) {
                 finished += 1;
@@ -87,10 +96,13 @@ fn main() {
     }
     let secs = t0.elapsed().as_secs_f64();
     println!(
-        "threads {} {}: {finished} games, {decisions} decisions, {lines} lines in {secs:.2}s: {:.0} games/s, {:.0} decisions/s",
+        "threads {} {}: {finished} games, {decisions} decisions, {lines} lines in {secs:.2}s: {:.0} games/s, {:.0} decisions/s (candidates {:.0}%, choose {:.0}%, read {:.0}%)",
         rayon::current_num_threads(),
         if showdown { "showdown seeds" } else { "integer seeds" },
         finished as f64 / secs,
         decisions as f64 / secs,
+        100.0 * t_cand / secs,
+        100.0 * t_choose / secs,
+        100.0 * t_read / secs,
     );
 }
