@@ -155,7 +155,7 @@ RESULT.json`, read `summarize.py`. Zero unclassified differences; Team Preview's
 ## 7. The fork's CI and the Areneon side
 
 `.github/workflows/ci.yml` runs the checks of step 5 at a small size, and `fidelity` plays the
-reference comparisons at about 11,600 games (10 to 15 minutes). `parity-at-scale.yml` runs a million.
+reference comparisons at about 8,100 games (about 12 minutes). `parity-at-scale.yml` runs a million.
 After the pull request is merged to the fork's `main`, the Areneon repository bumps its `vendor/ninjask`
 submodule to that commit; its pin test requires `vendor/ninjask/refsim/SHOWDOWN_COMMIT` to equal its own
 `vendor/pokemon-showdown` gitlink and the compiled `ninjask.SHOWDOWN_COMMIT` to equal both.
