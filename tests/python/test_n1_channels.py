@@ -253,5 +253,7 @@ def test_a_channel_forgets_what_the_reader_has_taken():
     battle.discard_channel("omniscient", 10)
     with pytest.raises(ValueError):
         battle.channel("omniscient", 0)
+    plain = ninjask.Batch(dex(), 1, names=NAMES)
+    plain.reset(0, row["packed"]["p1"], row["packed"]["p2"], row["seed"])
     with pytest.raises(ValueError, match="channels"):
-        ninjask.Batch(dex(), 1, names=NAMES).discard_channel(0, "p1", 1)
+        plain.discard_channel(0, "p1", 1)
