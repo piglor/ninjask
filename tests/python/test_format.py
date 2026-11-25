@@ -69,10 +69,11 @@ def test_export_path_prefers_generated_then_bundled(tmp_path, monkeypatch):
     bundled.mkdir()
     monkeypatch.setattr(fmt, "CACHE", cache)
     monkeypatch.setattr(fmt, "BUNDLED", bundled)
+    # Hand-made files: taken only with allow_unpinned (an export of refsim/export_format.js names its commit).
     (bundled / "x.json").write_text("{}")
-    assert fmt.export_path("x") == bundled / "x.json"  # a wheel's copy
+    assert fmt.export_path("x", allow_unpinned=True) == bundled / "x.json"  # a wheel's copy
     (cache / "x.json").write_text("{}")
-    assert fmt.export_path("x") == cache / "x.json"  # generated data first
+    assert fmt.export_path("x", allow_unpinned=True) == cache / "x.json"  # generated data first
 
 
 def test_load_is_cached_per_export_file(tmp_path, monkeypatch):
@@ -83,8 +84,8 @@ def test_load_is_cached_per_export_file(tmp_path, monkeypatch):
     monkeypatch.setattr(fmt, "CACHE", tmp_path)
     path = tmp_path / "x.json"
     path.write_text(json.dumps({"format": {"id": "x"}, "species": [], "moves": [], "items": [], "abilities": []}))
-    first = fmt.load("x")
-    assert fmt.load("x") is first  # parsed once
+    first = fmt.load("x", allow_unpinned=True)
+    assert fmt.load("x", allow_unpinned=True) is first  # parsed once
     path.write_text(json.dumps({"format": {"id": "y"}, "species": [], "moves": [], "items": [], "abilities": []}))
     os.utime(path, ns=(path.stat().st_atime_ns, path.stat().st_mtime_ns + 1_000_000))
-    assert fmt.load("x").id == "y"  # a rewritten export is read again
+    assert fmt.load("x", allow_unpinned=True).id == "y"  # a rewritten export is read again

@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 fn battle() -> Battle {
-    let dex = Arc::new(Dex::from_json(include_str!("fixtures/enumeration.json")).unwrap());
+    let dex = Arc::new(Dex::from_json_unpinned(include_str!("fixtures/enumeration.json")).unwrap());
     let mut b = Battle::new(
         dex,
         [
@@ -121,7 +121,7 @@ fn invalid_choices_are_errors() {
 
 #[test]
 fn pivot_stops_with_queue_intact_then_resumes() {
-    let dex = Arc::new(Dex::from_json(include_str!("fixtures/enumeration.json")).unwrap());
+    let dex = Arc::new(Dex::from_json_unpinned(include_str!("fixtures/enumeration.json")).unwrap());
     let team = "Fast|||battlearmor|U-turn|Hardy|||||50|]Slow|||battlearmor|Splash|Hardy|||||50|";
     let mut b = Battle::new(
         dex,
@@ -168,7 +168,7 @@ fn multihit_uses_independent_damage_rolls() {
 /// Rolls affect surviving HP, but never whether this hit wins the battle.
 #[test]
 fn crit_matters_but_damage_roll_does_not_change_ko() {
-    let dex = Arc::new(Dex::from_json(include_str!("fixtures/enumeration.json")).unwrap());
+    let dex = Arc::new(Dex::from_json_unpinned(include_str!("fixtures/enumeration.json")).unwrap());
     let mut b = Battle::new(
         dex,
         [
@@ -245,7 +245,7 @@ fn chance_battle(accuracy: u8, poison: bool, tied: bool) -> Battle {
     if poison {
         data["moves"][0]["secondaries"] = serde_json::json!([{"chance": 30, "status": "psn"}]);
     }
-    let dex = Arc::new(Dex::from_json(&data.to_string()).unwrap());
+    let dex = Arc::new(Dex::from_json_unpinned(&data.to_string()).unwrap());
     let second = if tied {
         "Fast|||noability|Tackle,Splash|Hardy|||||50|"
     } else {

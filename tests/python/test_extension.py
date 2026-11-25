@@ -90,7 +90,8 @@ def test_the_opt_in_with_no_declaration_is_an_error():
 
 def test_load_takes_the_name_as_an_argument(declared, monkeypatch):
     monkeypatch.syspath_prepend(str(declared))
-    assert extension.load().__name__ == "ninjask._core"
+    with pytest.warns(UserWarning, match="ignored"):
+        assert extension.load().__name__ == "ninjask._core"
     assert extension.load("fake").__name__ == "fake_ninjask_ext"
 
 

@@ -22,7 +22,9 @@ use serde_json::Value;
 
 fn dex() -> Option<Arc<Dex>> {
     let json = common::format_export("gen9championsvgc2026regmc")?;
-    Some(Arc::new(Dex::from_json(&json).ok()?))
+    Some(Arc::new(
+        Dex::from_json(&json).expect("the format export loads"),
+    ))
 }
 
 fn mon(species: &str, ability: &str, moves: &[&str], gender: &str) -> String {

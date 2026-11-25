@@ -60,7 +60,10 @@ fn the_unpinned_loader_takes_any_export_and_reports_its_commit() {
     let hand_made = Dex::from_json_unpinned(&export_from(None)).unwrap();
     assert_eq!(hand_made.format.showdown_commit, None);
     let previous = Dex::from_json_unpinned(&export_from(Some(PREVIOUS_PIN))).unwrap();
-    assert_eq!(previous.format.showdown_commit.as_deref(), Some(PREVIOUS_PIN));
+    assert_eq!(
+        previous.format.showdown_commit.as_deref(),
+        Some(PREVIOUS_PIN)
+    );
 }
 
 #[test]

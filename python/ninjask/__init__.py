@@ -94,8 +94,12 @@ MAX_RETRIES = 25
 
 
 @lru_cache(maxsize=8)
-def dex(format_id: str) -> Dex:
-    return Dex.load(str(export_path(format_id)))  # exports the format if missing
+def dex(format_id: str, *, data_dir: str | Path | None = None, allow_unpinned: bool = False) -> Dex:
+    """The format's `Dex`, from an export of the engine's pin (see `export_path` for where it is
+    read from, `data_dir` for an installed wheel, and `allow_unpinned` for a hand-made export).
+    Exports the format from the checkout's Showdown if there is no export yet."""
+    path = export_path(format_id, data_dir=data_dir, allow_unpinned=allow_unpinned)
+    return Dex.load(str(path), allow_unpinned=allow_unpinned)
 
 
 @dataclass
