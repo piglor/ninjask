@@ -43,7 +43,7 @@ impl Battle {
         if self.accuracy_event(r, t, mv) {
             return true;
         }
-        (self.rng.random(100) as f64) < acc
+        self.rng.chance_f(acc, 100)
     }
 
     /// The move's hit count after ModifyMove: Skill Link takes the most.

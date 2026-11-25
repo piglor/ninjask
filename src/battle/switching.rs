@@ -181,7 +181,7 @@ impl Battle {
         if bench.is_empty() || self.mon((s, slot)).hp == 0 {
             return;
         }
-        let pick = bench[self.rng.random(bench.len() as u32) as usize];
+        let pick = self.rng.sample(&bench);
         // dragIn runs DragOut again: an ability gained since the flag was
         // set (Guard Dog through Wandering Spirit) still holds it.
         if self.drag_out_blocked((s, slot)) {

@@ -669,7 +669,7 @@ impl Battle {
                 if allies.is_empty() {
                     0
                 } else {
-                    let a = allies[self.rng.random(allies.len() as u32) as usize];
+                    let a = self.rng.sample(&allies);
                     -(a.1 as i8 + 1)
                 }
             }
@@ -678,7 +678,7 @@ impl Battle {
                 if foes.is_empty() {
                     1
                 } else {
-                    let f = foes[self.rng.random(foes.len() as u32) as usize];
+                    let f = self.rng.sample(&foes);
                     f.1 as i8 + 1
                 }
             }

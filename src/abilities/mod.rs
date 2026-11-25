@@ -150,7 +150,7 @@ impl Battle {
         if candidates.is_empty() {
             return;
         }
-        let target = candidates[self.rng.random(candidates.len() as u32) as usize];
+        let target = self.rng.sample(&candidates);
         let ability = self.mon(target).ability;
         self.set_ability(r, ability, target, "ability: Trace");
     }
