@@ -2,13 +2,14 @@
 //! policy, finished battles restarted until GAMES games have finished; every
 //! decision is observed (observation, ids, legal choices) as in training.
 //! `cargo run --release --example batch_bench -- <dex.json> <teams.txt> [N] [GAMES]`;
-//! set RAYON_NUM_THREADS to vary the thread count.
+//! set RAYON_NUM_THREADS to vary the thread count. A fifth argument `showdown`
+//! seeds the battles with Showdown seeds (`sodium,<hex>`) instead of integers.
 
 use std::sync::Arc;
 use std::time::Instant;
 
 use ninjask::batch::Batch;
-use ninjask::rng::Rng;
+use ninjask::rng::{Rng, Seed};
 use ninjask::Dex;
 
 fn main() {
@@ -22,6 +23,7 @@ fn main() {
         .collect();
     let n: usize = args.get(3).and_then(|x| x.parse().ok()).unwrap_or(256);
     let games: usize = args.get(4).and_then(|x| x.parse().ok()).unwrap_or(10_000);
+    let showdown = args.get(5).is_some_and(|m| m == "showdown");
     let mut batch = Batch::new(dex, n);
     let mut started = 0usize;
     let start = |b: &mut Batch, i: usize, started: &mut usize| {
@@ -29,7 +31,15 @@ fn main() {
             &pool[(7 * *started) % pool.len()],
             &pool[(7 * *started + 3) % pool.len()],
         );
-        b.reset(i, [a, c], *started as u64).unwrap();
+        if showdown {
+            let seed = Seed::Showdown(format!(
+                "sodium,{:032x}",
+                (*started as u128 + 1) * 0x9e37_79b9_7f4a_7c15
+            ));
+            b.reset_seeded(i, [a, c], &seed, None).unwrap();
+        } else {
+            b.reset(i, [a, c], *started as u64).unwrap();
+        }
         *started += 1;
     };
     for i in 0..n {

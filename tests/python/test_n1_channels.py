@@ -232,3 +232,26 @@ def test_channels_do_not_change_the_game():
         plain.choose([(0, NAMES.index(c["player"]), c["choice"])])
     assert plain.battle(0).log("omniscient", 0) == with_channels.battle(0).log("omniscient", 0)
     assert plain.battle(0).rng_seed == with_channels.battle(0).rng_seed
+
+
+def test_a_channel_forgets_what_the_reader_has_taken():
+    row = battles()[3]
+    batch = replay_batch(row)
+    whole = batch.channel(0, "p1")
+    middle = len(whole) // 2
+    batch.discard_channel(0, "p1", middle)
+    assert batch.channel_len(0, "p1") == len(whole)  # line numbers do not change
+    assert batch.channel(0, "p1", len(whole) - 5) == whole[-5:]
+    assert batch.channel(0, "p1", middle + 40)[:3] == whole[middle + 40: middle + 43]
+    with pytest.raises(ValueError, match="discarded"):
+        batch.channel(0, "p1", 0)
+    # the other channels are untouched, and a discard past the end empties nothing that is to come
+    assert batch.channel(0, "p2") == row["channels"]["p2"]
+    batch.discard_channel(0, "p1", len(whole))
+    assert batch.channel(0, "p1", len(whole)) == []
+    battle = ninjask.Battle.reference(dex(), row["packed"]["p1"], row["packed"]["p2"], row["seed"], names=NAMES, channels=True)
+    battle.discard_channel("omniscient", 10)
+    with pytest.raises(ValueError):
+        battle.channel("omniscient", 0)
+    with pytest.raises(ValueError, match="channels"):
+        ninjask.Batch(dex(), 1, names=NAMES).discard_channel(0, "p1", 1)

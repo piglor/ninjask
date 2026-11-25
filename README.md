@@ -182,6 +182,22 @@ view, so, as in Showdown, one can be refused for something hidden (a foe's
 Imprison, a trap): the decision then stays pending, with what the refusal
 revealed.
 
+#### Showdown's streams, candidates and draws for a training harness
+
+`ninjask.Batch` also hands over what a harness that builds its own player
+view needs, exact against Showdown: `Batch(d, n, names=("p1", "p2"),
+channels=True)` keeps each battle's *channels*, the stream Showdown sends each
+player (`batch.channel(i, "p1", start)`: the log as that player sees it, with
+the `|request|` lines, wait requests and `|error|` lines where Showdown sends
+them); `batch.candidates(i, side)` lists `(choice, pending)` for the side's
+request in the order of a fixed reference enumerator (360 ordered Team
+Preview picks, `pending` where a hidden trap or disable could make the engine
+refuse), `batch.choose(...)` and `batch.choose_candidates(...)` submit them;
+`reset` takes a Showdown seed (`"sodium,<hex>"`) as well as an integer; and
+`record_draws=True` / `set_forced_draws(...)` log and force the random draws
+for comparing a battle with Showdown's draw for draw. See
+[`docs/n1-seeds-channels-candidates.md`](docs/n1-seeds-channels-candidates.md).
+
 ### Rust
 
 ```sh
@@ -481,8 +497,9 @@ built from `src/python.rs` as `ninjask._core` and re-exported by the package)
   first), and `.encode_ids()` its species, items, abilities and moves as
   `ninjask.IDS_LEN` int16 values (0 when unknown), as bytes for
   `numpy.frombuffer`; layouts in `src/encode.rs`.
-- `Batch(dex, n)`: `n` battles with both players' trackers, stepped in
-  parallel with the GIL released. `.reset(i, team1, team2, seed)`,
+- `Batch(dex, n, names=None, channels=False, record_draws=False)`: `n`
+  battles with both players' trackers (made when `observe` is first called),
+  stepped in parallel with the GIL released. `.reset(i, team1, team2, seed)`,
   `.reset_many(...)`, `.observe()` (every pending decision: who, the
   observation and ids, the legal actions and their offsets),
   `.step(choices)` (one index per decision; all checked before any is
@@ -662,6 +679,9 @@ In [`docs/`](docs/):
 - [`design.md`](docs/design.md): requirements, architecture, how it is verified,
   and the findings of reference mode (every non-obvious Showdown behaviour the
   engine reproduces).
+- [`n1-seeds-channels-candidates.md`](docs/n1-seeds-channels-candidates.md):
+  Showdown seeds in `Batch`, per-player channels, candidates in the order of a
+  reference enumerator, the draw log and forced draws.
 - [`adding-a-mechanic.md`](docs/adding-a-mechanic.md): how to add a move,
   ability or item, and how to verify it.
 - [`CHANGELOG.md`](CHANGELOG.md): what changed in each release.

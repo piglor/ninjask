@@ -2,6 +2,45 @@
 
 ## Unreleased
 
+Fork changes for a training harness (Areneon, ticket #1532): Showdown seeds in
+`Batch`, per-player channels, candidates and the draw log. See
+`docs/n1-seeds-channels-candidates.md`. Games play as before (the same draws
+in the same order for every seed); logs gain five `|-hint|` lines Showdown
+prints, so `examples/fingerprint` moves.
+
+### Added
+
+- **Showdown seeds in `Batch`**: `reset` and `reset_many` take a `"sodium,<hex>"`
+  seed as well as an integer (`ninjask::rng::Seed`); `Batch(dex, n, names=...)`.
+- **Channels** (`ninjask::channel`): each viewer's stream as Showdown sends
+  it, byte-equal on the recorded corpus: the banner the format export now
+  carries (`format.banner`, from `refsim/export_banner.js`), `|request|` lines
+  with wait requests and without `rqid`, `|error|` lines and the request
+  again after a refusal that revealed something, the blank line before
+  `|win|` / `|tie`. `Batch(..., channels=True)`, `Battle(..., channels=True)`,
+  `channel(viewer, start)`, `channel_len`, `request_hash` (`ninjask::identity`:
+  SHA-256 of the canonical JSON of the request without `rqid`).
+- **Candidates** (`ninjask::candidates`): `Battle.candidates(side)` /
+  `Batch.candidates(i, side)`, a port of Areneon's reference enumerator
+  (360 ordered Team Preview picks, its order, `pending` flags);
+  `Batch.choose` (text), `Batch.choose_candidates` (indices),
+  `Batch.pending()`; `Battle.chosen(side)`.
+- **Draw log and forced draws** (`ninjask::rng`): `record_draws=True`,
+  `take_draws()`, `set_forced_draws()`, `reset(..., forced_draws=...)`: every
+  call of Showdown's PRNG (`random`, `randomChance`, `sample`, `shuffle`) with
+  its arguments and result, and a mode that answers calls from a list.
+- `Batch` builds the trackers `observe` reads when it is first called, so a
+  batch read through channels builds none.
+
+### Changed
+
+- Five sites that drew `random(n)` directly call the method Showdown calls
+  (`sample`, `randomChance`): the numbers drawn are unchanged.
+- The engine's log carries five `|-hint|` lines it omitted (Skill Swap
+  between allies, Future Sight that does not hit, Dark's immunity to
+  Prankster, Rising Voltage on a grounded target, Psychic Terrain not
+  protecting an airborne target). The fingerprint's log hash changes.
+
 ## 0.4.1+areneon.0 (2026-11-25)
 
 The Areneon fork (https://github.com/piglor/ninjask) of upstream 0.4.1 (commit
