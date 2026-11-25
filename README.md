@@ -1,8 +1,25 @@
 # Ninjask
 
-[![CI](https://github.com/dcabatin/Ninjask/actions/workflows/ci.yml/badge.svg)](https://github.com/dcabatin/Ninjask/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/ninjask)](https://pypi.org/project/ninjask/)
-[![crates.io](https://img.shields.io/crates/v/ninjask)](https://crates.io/crates/ninjask)
+[![CI](https://github.com/piglor/ninjask/actions/workflows/ci.yml/badge.svg)](https://github.com/piglor/ninjask/actions/workflows/ci.yml)
+
+> **This is the Areneon fork** of [dcabatin/Ninjask](https://github.com/dcabatin/Ninjask)
+> (MIT; upstream version 0.4.1, commit `8a59175`), version `0.4.1+areneon.0`. It is vendored
+> by the Areneon project as a CPU-native engine for **training play**; Pokémon Showdown stays
+> the referee for evaluation, and the only authority on what is legal.
+>
+> - **Pinned to Showdown `7244fe8`** (`refsim/SHOWDOWN_COMMIT`), the pin Areneon runs on, not
+>   upstream's `3a766f2`. Everything the engine knows of the game comes from exports of that
+>   checkout, recorded in `refsim/PROVENANCE.json` (checked by `scripts/repin.py provenance
+>   check` and the tests). `docs/repin.md` is the procedure for every pin bump.
+> - **What differs from upstream 0.4.1** (CHANGELOG): Showdown d12b9c1e9's Champions No Retreat
+>   behaviour (it adds the `trapped` volatile itself), Revival Blessing's forced-switch
+>   choices (`pass, pass` when nobody lives on the bench, and its slot condition ending in the
+>   residual), the exports' handler hashes and pin verification, `ninjask.SHOWDOWN_COMMIT`.
+>   The public API is otherwise upstream's.
+> - **Not published**: no PyPI package or crate of this fork exists. The `ninjask` on PyPI and
+>   crates.io is upstream's (pinned to `3a766f2`); the fork's Python distribution is named
+>   `ninjask-areneon` so the two cannot be mixed up. Build from source (`maturin`, below);
+>   `pip install ninjask` and `cargo add ninjask` below are upstream's instructions.
 
 **A Pokémon Champions VGC doubles simulator that matches
 [Pokémon Showdown](https://github.com/smogon/pokemon-showdown) exactly, about
@@ -280,7 +297,7 @@ harness on a few games.
   Down. They belong only to formes that are not legal in Reg M-C
   (Cramorant-Gulping and -Gorging, Eiscue-Noice, Minior-Meteor);
   `Dex.team_problems` names them if a team uses them.
-- **One pinned Showdown.** Parity is with commit `3a766f2` (2026-10-13).
+- **One pinned Showdown.** Parity is with commit `7244fe8` (2026-10-16; upstream Ninjask: `3a766f2`).
   Changes Showdown makes after it are not followed until the pin moves. The
   tracker reads logs from the live server, which may run a newer version.
 - **Wheels** are for CPython 3.12 and later on the platforms listed in the

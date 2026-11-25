@@ -1,11 +1,11 @@
 [package]
 name = "ninjask"
-version = "0.4.1"
+version = "0.4.1+areneon.0"
 edition = "2021"
 description = "A Pokémon Champions VGC doubles simulator that matches Pokémon Showdown exactly, about 200 times faster"
 license = "MIT"
 readme = "README.md"
-repository = "https://github.com/dcabatin/Ninjask"
+repository = "https://github.com/piglor/ninjask"
 documentation = "https://docs.rs/ninjask"
 categories = ["simulation", "game-development"]
 keywords = ["pokemon", "showdown", "vgc", "simulator", "battle"]
@@ -13,7 +13,17 @@ keywords = ["pokemon", "showdown", "vgc", "simulator", "battle"]
 # Python package and the reference harness (pyproject.toml ships those).
 # Anchored at the root ("/"), or "src/" and "README.md" would also match
 # third_party/ and .venv/ in a working checkout.
-include = ["/src/", "/examples/", "/tests/", "/LICENSE", "/NOTICE", "/README.md", "/CHANGELOG.md", "/Cargo.toml", "/Cargo.lock"]
+include = ["/src/", "/examples/", "/tests/", "/refsim/SHOWDOWN_COMMIT", "/LICENSE", "/NOTICE", "/README.md", "/CHANGELOG.md", "/Cargo.toml", "/Cargo.lock"]
+
+# The Areneon fork (https://github.com/piglor/ninjask) of dcabatin/Ninjask 0.4.1 at
+# 8a59175f3915771285cd16fce5d7f788610ff242. The pin is `refsim/SHOWDOWN_COMMIT`, the
+# one source of truth (`ninjask::SHOWDOWN_COMMIT` is that file); it is repeated
+# here and in NOTICE and refsim/PROVENANCE.json for readers of the manifest, and
+# tests/pin.rs and tests/python/test_pin_provenance.py hold the copies equal.
+[package.metadata.areneon]
+showdown_commit = "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b"
+upstream = "https://github.com/dcabatin/Ninjask"
+upstream_commit = "8a59175f3915771285cd16fce5d7f788610ff242"
 
 [lib]
 name = "ninjask"

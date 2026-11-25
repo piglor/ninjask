@@ -3,6 +3,8 @@ re-exports them; see `ninjask._extension` for where they come from."""
 
 from typing import TypedDict, final
 
+SHOWDOWN_COMMIT: str
+"""The Pokémon Showdown commit the engine is a port of (`refsim/SHOWDOWN_COMMIT`)."""
 OBS_LEN: int
 """Floats in `Tracker.encode()` (layout: `ninjask::encode::observation`)."""
 IDS_LEN: int

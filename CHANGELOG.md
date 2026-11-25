@@ -2,6 +2,65 @@
 
 ## Unreleased
 
+## 0.4.1+areneon.0 (2026-11-25)
+
+The Areneon fork (https://github.com/piglor/ninjask) of upstream 0.4.1 (commit
+`8a59175f3915771285cd16fce5d7f788610ff242`), moved to Pokémon Showdown
+`7244fe8e28fa8bc4d0809ae30d183c608b62bb2b` (upstream: `3a766f2`; six Showdown
+commits, `docs/repin.md` classifies them). The fingerprint is unchanged,
+`c826ee9bb327b2d8`: no fixture team uses No Retreat or a forced Revival Blessing
+pass.
+
+### Changed
+
+- **Pinned to Showdown 7244fe8** (`refsim/SHOWDOWN_COMMIT`). Of its six commits one
+  changes battle behaviour, the rest are tiers, items and server code that the exports
+  carry or ignore (a diff of the exports of the four bundled formats between the two pins
+  differs in one entity, `noretreat`).
+- **No Retreat** (Showdown d12b9c1e9, "Champions: Can no longer double No Retreat when
+  already trapped", #12124): the condition's start adds the `trapped` volatile itself
+  (`|-activate|POKEMON|trapped`, then `|-start|POKEMON|move: No Retreat`) and the
+  condition no longer traps on its own. A Pokémon that is already trapped, or a Ghost
+  type, gets the `noretreat` volatile and prints nothing; Baton Pass hands `noretreat`
+  on without the trap (`trapped` is `noCopy`). Upstream 0.4.1 diverged from the pin in 9 of
+  3,200 battles on this, and in 146 of 400 games of `check_reference.py --require noretreat`.
+- **Revival Blessing's forced switch**: the reviving Pokémon may pass when no living
+  Pokémon waits on the bench, as Showdown's `forcedPassesLeft` allows (`pass, pass` was
+  missing from `legal_choices` and `ninjask.choices.joint_choices`; the engine accepted
+  it when sent). The joint-choice rule is now Showdown's own bookkeeping (forced switches
+  and passes counted as `Side.clearChoice` counts them, read slot by slot) instead of "fill
+  as many slots as possible". The slot condition now ends in the turn's residual (duration
+  1), so a passed revival no longer asks again after the turn: found by `check_chaos.py`
+  once the passes could be chosen (nine games of seed 1, now in `tests/python/test_chaos.py`).
+- The Python distribution is named `ninjask-areneon` (the import name is `ninjask`), so it
+  cannot be confused with upstream's `ninjask` on PyPI. Version `0.4.1+areneon.0`.
+- `release.yml` (publishing to PyPI and crates.io) is removed: this fork publishes nothing.
+
+### Added
+
+- `refsim/PROVENANCE.json`: the pin, the export tool's hashes and the hash of every bundled
+  format (and of each section of it), written and checked by `scripts/repin.py provenance`;
+  `docs/repin.md`, the procedure for every pin bump, with `repin.py diff-showdown` (the commits
+  and files between two pins, classified) and `diff-exports` (what the data exports
+  differ in).
+- `ninjask.SHOWDOWN_COMMIT` / `ninjask::SHOWDOWN_COMMIT`: the pin, compiled in from
+  `refsim/SHOWDOWN_COMMIT`. `tests/pin.rs` holds every place that names it equal.
+- The exports carry `callbackHashes`, a hash of the source of each handler, so a pin bump's diff
+  shows a handler whose body changed under an unchanged name.
+- CI: `--locked` builds, the provenance check, a No Retreat run, a `supply-chain` job
+  (`deny.toml`: licences, sources, advisories) and a larger `fidelity` job.
+- Tests that replay Showdown 7244fe8: `tests/python/test_pin_sync.py`, `tests/pin_sync.rs`,
+  `tests/python/test_pin_provenance.py`.
+
+### Fixed
+
+- `refsim/export_format.js` took `showdownCommit` from the pin file, not from the checkout it
+  exported, so an export of any commit said it was the pinned one. It reads the checkout's
+  commit, and refuses a checkout that is not the pin or has tracked files changed
+  (`NINJASK_ALLOW_UNPINNED=1` exports any checkout and records the commit it is).
+- A format export cached from another commit than the pin was used silently; it is now exported
+  again (`ninjask.format.export_path`), and the Rust tests refuse it.
+
 ## 0.4.1 (2026-11-17)
 
 Fixes from a new round of fuzzing: choice handling, which no earlier check

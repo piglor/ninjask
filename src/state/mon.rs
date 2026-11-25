@@ -163,6 +163,10 @@ pub struct Volatiles {
     /// `trapped` (Block, Mean Look, Spirit Shackle, Jaw Lock): linked to
     /// this Pokémon's `trapper` volatile.
     pub trapped: Option<(usize, usize)>,
+    /// `trapped` with no trapper: the one No Retreat's start adds to its own
+    /// user (`addVolatile('trapped')`, nothing linked). At most one of this
+    /// and `trapped` is set: they are the one volatile.
+    pub trapped_free: bool,
     /// `trapper`: the Pokémon this one keeps trapped, a bit per
     /// `(side, position)` (`side * 8 + position`); none when 0.
     pub trapper: u16,
@@ -176,7 +180,8 @@ pub struct Volatiles {
     /// on to while that one stays on the field.
     pub lock_on_duration: u8,
     pub lock_on: Option<(usize, usize)>,
-    /// No Retreat: the Pokémon is trapped.
+    /// No Retreat: the volatile, which Champions' condition (Showdown d12b9c1e9)
+    /// gives no trap of its own: its start adds `trapped` (`trapped_free`).
     pub no_retreat: bool,
     /// Octolock: the Pokémon that holds this one (`effectState.source`).
     pub octolock: Option<(usize, usize)>,

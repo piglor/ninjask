@@ -63,6 +63,11 @@ GAMES = [
     (37, 3301),  # Instructed Mirror Coat queues only its before-turn action
     (43, 400),  # a Baton-Passed Gastro Acid: Illusion revealed as Zoroark faints
     (43, 3158),  # Fling's end line when Symbiosis already gave the item away
+    (1, 6),  # Revival Blessing passed with only the residual left: the slot condition ends there
+    (1, 87),  # a passed Revival Blessing, the same
+    (1, 367),  # a passed Revival Blessing, the same
+    (1, 1015),  # a passed Revival Blessing, the same
+    (1, 1309),  # a passed Revival Blessing, the same
 ]
 # (seed, game, mix) from the wider pools.
 MIXED = [
@@ -100,6 +105,10 @@ MIXED = [
     (952, 281, "mixed"),  # a Choice item's addVolatile runs TryAddVolatile, whose sort draws on ties
     (1103, 1611, "mixed"),  # Ally Switch failing is NOT_FAIL: no AfterMoveSecondary (Berserk's flag)
     (9602, 2611, "wide"),  # Destiny Bond ends in BeforeMove, before the move's own beforeMoveCallback (Focus Punch)
+    (1, 589, "wide"),  # a passed Revival Blessing: its slot condition (duration 1) ends in the residual
+    (1, 997, "wide"),  # a passed Revival Blessing, the same
+    (1, 839, "mixed"),  # a passed Revival Blessing, the same
+    (1, 1142, "mixed"),  # a passed Revival Blessing, the same
 ]
 
 

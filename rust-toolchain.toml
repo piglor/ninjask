@@ -1,0 +1,8 @@
+# The Rust toolchain every build, test and lint of the fork uses (rustup reads this file; CI names the
+# same version). Pinned, not "stable": a new stable's clippy flags old code and fails -D warnings on a day
+# nothing changed. A bump is its own change: update the version here and in .github/workflows/ci.yml,
+# fix what its clippy says, and run the checks of docs/repin.md.
+[toolchain]
+channel = "1.97.1"
+components = ["clippy", "rustfmt"]
+profile = "minimal"

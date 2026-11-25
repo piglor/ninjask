@@ -2038,10 +2038,12 @@ impl Tracker {
     /// Whether the active Pokémon `k` of side `s` can't switch out, as far as
     /// the log and the player's own team show, and whether it could escape
     /// with a Shed Shell: its item is unknown and may be one, or is one.
-    /// Trapping volatiles (`trapped`, partial trapping while its user is on
-    /// the field, Octolock likewise, Ingrain, No Retreat), Fairy Lock, and a
-    /// foe's known Shadow Tag trap it, unless it is a Ghost (by its known
-    /// types) or, for Shadow Tag, has that ability itself.
+    /// Trapping volatiles (`trapped`, which No Retreat's start adds to its
+    /// own user since Showdown d12b9c1e9, partial trapping while its user is on
+    /// the field, Octolock likewise, Ingrain), Fairy Lock, and a foe's known
+    /// Shadow Tag trap it, unless it is a Ghost (by its known types) or, for
+    /// Shadow Tag, has that ability itself. The `noretreat` volatile traps
+    /// nothing by itself: a Baton Pass hands it on without the `trapped`.
     pub fn trap_state(&self, s: usize, k: usize) -> (bool, bool) {
         let m = &self.sides[s].mons[k];
         if m.fainted {
@@ -2079,7 +2081,6 @@ impl Tracker {
         };
         let mut trapped = held("trapped")
             || held("ingrain")
-            || held("noretreat")
             || (held("partiallytrapped") && source_ok("partiallytrapped"))
             || (held("octolock") && source_ok("octolock"))
             || self.field.fairy_lock.is_some();
@@ -2313,7 +2314,8 @@ impl Tracker {
             if let Some(m) = self.mon_mut(&who) {
                 m.add_volatile_at("trapped", turn);
             }
-            if let Some(h) = holder {
+            // No Retreat's own `trapped` (the user is its target) has no trapper to leave.
+            if let Some(h) = holder.filter(|h| *h != who) {
                 self.record_trap_source(&who, "trapped", &h);
             }
         }

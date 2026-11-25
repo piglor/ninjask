@@ -117,3 +117,39 @@ def test_revival_blessing_picks_a_fainted_teammate():
         **side(mon("Pawmot", True, reviving=True), mon("B", True), mon("C", hp="0 fnt"), mon("D")),
     }
     assert joint_choices(req) == ["switch 3, pass"]
+
+
+def test_revival_blessing_may_pass_when_no_living_pokemon_waits_on_the_bench():
+    # Showdown: a forced pass is allowed for each Pokémon that must switch and has
+    # nobody to replace it, the reviving one included (`forcedPassesLeft`).
+    req = {
+        "forceSwitch": [False, True],
+        **side(mon("A", True), mon("Pawmot", True, reviving=True), mon("C", hp="0 fnt"), mon("D", hp="0 fnt")),
+    }
+    assert joint_choices(req) == ["pass, switch 3", "pass, switch 4", "pass, pass"]
+
+
+def test_revival_blessing_must_revive_while_a_living_pokemon_waits_on_the_bench():
+    req = {
+        "forceSwitch": [False, True],
+        **side(mon("A", True), mon("Pawmot", True, reviving=True), mon("C", hp="0 fnt"), mon("D")),
+    }
+    assert joint_choices(req) == ["pass, switch 3"]
+
+
+def test_revival_blessing_and_a_faint_in_one_request():
+    # Both slots must switch (the fainted one and the reviver); one living Pokémon waits, so one
+    # forced switch is needed and one pass is allowed (Showdown's forcedSwitchesLeft and
+    # forcedPassesLeft). A revival counts as that switch, as it does in Showdown, and may pick the
+    # Pokémon that has just fainted in the other slot.
+    req = {
+        "forceSwitch": [True, True],
+        **side(mon("A", True, "0 fnt"), mon("Pawmot", True, reviving=True), mon("C", hp="0 fnt"), mon("D")),
+    }
+    assert joint_choices(req) == [
+        "switch 4, switch 1",
+        "switch 4, switch 3",
+        "switch 4, pass",
+        "pass, switch 1",
+        "pass, switch 3",
+    ]

@@ -434,11 +434,7 @@ impl Battle {
             }
             did = did.max(Did::Done);
         }
-        if let Some(v) = mv
-            .volatile_status
-            .as_ref()
-            .filter(|_| !self.skip_volatile_status(src, mv))
-        {
+        if let Some(v) = mv.volatile_status.as_ref() {
             let added = match self.add_move_volatile_from_user(t, src, mv, v) {
                 Some(added) => added,
                 None => match self.add_move_volatile_with_source(t, src, v) {

@@ -1,0 +1,131 @@
+{
+ "description": "A synthetic battle (random-legal play, Showdown 7244fe8e) that reaches p2's Revival Blessing forceSwitch request with no living Pok\u00e9mon on the bench: Showdown offers 'pass, pass' beside the two revives; the engine listed only the revives (Ninjask 0.4.1). Showdown accepted 'pass, pass', asked p2 again for the same revival (the slot condition lasts to the residual), and p2 then revived with 'pass, switch 3'.",
+ "format": "gen9championsvgc2026regmc",
+ "seed": "sodium,94637951a5484ad0f15dc9e4714d9d95",
+ "teams": {
+  "p1": "Abomasnow||DampRock|Soundproof|GrassyGlide,GigaDrain,SolarBeam,FocusBlast|Serious|15,,,3,28,20||||50|]Castform||LifeOrb|Forecast|Amnesia,FireBlast,Substitute,Blizzard|Rash|24,24,,18,,||||50|]Gourgeist|GourgeistSuper|PasshoBerry|Frisk|Safeguard,ConfuseRay,SludgeBomb,SeedBomb|Bashful|9,10,,14,23,10||||50|]Lopunny||FairyFeather|Limber|Substitute,HyperVoice,Protect,Switcheroo|Quiet|,2,22,,18,24||||50|]Snorlax||ElectricSeed|Gluttony|Thunderbolt,Earthquake,SupercellSlam,Stockpile|Quiet|3,8,28,23,4,||||50|]Toucannon||MentalHerb|SkillLink|SmackDown,BrickBreak,KnockOff,Round|Rash|5,21,,3,6,31||||50|",
+  "p2": "Corviknight||WiseGlasses|Unnerve|LightScreen,BraveBird,FocusEnergy,Agility|Rash|,15,11,6,30,4||||50|]Pawmot||LightBall|VoltAbsorb|ElectricTerrain,RevivalBlessing,Charm,SupercellSlam|Gentle|5,6,20,1,31,3||||50|]Skeledirge||PechaBerry|Unaware|FlareBlitz,NightShade,Crunch,TorchSong|Sassy|29,,25,9,,3||||50|]Torterra||RoseliBerry|ShellArmor|Tickle,GrassKnot,LightScreen,WoodHammer|Bold|23,11,21,11,,||||50|]Toxapex||FocusBand|Merciless|IcyWind,LightScreen,Pounce,GunkShot|Naive|,3,,32,30,1||||50|]Toxtricity|ToxtricityLowKey|ColburBerry|PunkRock|Uproar,GigaImpact,Trailblaze,Facade|Brave|32,8,12,,1,13||||50|"
+ },
+ "inputs": [
+  [
+   "p1",
+   "team 2153"
+  ],
+  [
+   "p2",
+   "team 3412"
+  ],
+  [
+   "p1",
+   "switch 4, move 3 -1"
+  ],
+  [
+   "p2",
+   "move 3 -2, switch 4"
+  ],
+  [
+   "p1",
+   "switch 3, move 1"
+  ],
+  [
+   "p2",
+   "move 3 1, move 4 2"
+  ],
+  [
+   "p1",
+   "move 1 2, move 3 -1"
+  ],
+  [
+   "p2",
+   "move 1 1, move 1"
+  ],
+  [
+   "p1",
+   "move 1 1, move 1"
+  ],
+  [
+   "p2",
+   "move 1 -2, move 3 1"
+  ],
+  [
+   "p1",
+   "move 1 2, switch 4"
+  ],
+  [
+   "p2",
+   "move 4 1, switch 3"
+  ],
+  [
+   "p1",
+   "switch 3, pass"
+  ],
+  [
+   "p1",
+   "move 4 1, move 4"
+  ],
+  [
+   "p2",
+   "move 1 1, move 4"
+  ],
+  [
+   "p1",
+   "move 2 2, move 2 -1"
+  ],
+  [
+   "p2",
+   "move 4 -2, move 2 1"
+  ],
+  [
+   "p1",
+   "switch 4, pass"
+  ],
+  [
+   "p2",
+   "pass, switch 4"
+  ],
+  [
+   "p1",
+   "move 4 1, move 3"
+  ],
+  [
+   "p2",
+   "move 3 2, switch 3"
+  ],
+  [
+   "p1",
+   "move 1 2, move 3"
+  ],
+  [
+   "p2",
+   "move 3 2, move 3 1"
+  ],
+  [
+   "p1",
+   "move 3 -2, move 4"
+  ],
+  [
+   "p2",
+   "move 3 -2, move 4 -1"
+  ],
+  [
+   "p2",
+   "switch 3, pass"
+  ],
+  [
+   "p1",
+   "move 1, move 4"
+  ],
+  [
+   "p2",
+   "move 1 -2, move 2"
+  ]
+ ],
+ "request_owner": "p2",
+ "showdown_accepted": "pass, pass",
+ "then": [
+  [
+   "p2",
+   "pass, switch 3"
+  ]
+ ]
+}

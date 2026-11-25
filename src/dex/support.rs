@@ -62,6 +62,8 @@ const GENERIC_MOVE_FIELDS: &[&str] = &[
     "zMove",
     "maxMove",
     "callbacks",
+    // A hash of each callback's Showdown source, for diffing exports between pins (docs/repin.md).
+    "callbackHashes",
     "coreRef",
     "tags",
     "isNonstandard",

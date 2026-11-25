@@ -5,6 +5,10 @@ Pokémon Showdown at the commit in `refsim/SHOWDOWN_COMMIT` is the
 specification. A change is correct when the engine does what that commit
 does, and the checks below are how we know.
 
+This is the Areneon fork (see the README). Moving the pin is a procedure of
+its own: [`docs/repin.md`](docs/repin.md). Pull requests go to this repository,
+not to upstream's; a fix that is not about the pin is welcome upstream too.
+
 ## Ways to help
 
 - **Report a difference from Showdown.** Any mismatch is a bug: a log line,
@@ -41,8 +45,9 @@ CI runs these on every pull request; run them before you open one:
 cargo fmt --check
 cargo clippy --release --all-targets -- -D warnings
 cargo clippy --release --all-targets --features python-module -- -D warnings
-cargo test --release
+cargo test --release --locked
 pytest -q
+python scripts/repin.py provenance check
 python scripts/check_reference.py --synthetic --games 200 --workers 4
 python scripts/check_reference.py --pool pools/vgcpastes-regmc.txt --games 200 --workers 4
 cargo run --release --example fingerprint -- data/derived/format/gen9championsvgc2026regmc.json tests/fixtures/regmc_teams.txt 2000

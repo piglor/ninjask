@@ -644,6 +644,8 @@ impl<'a> Builder<'a> {
                 }
                 "trapped" => match source(id) {
                     Some(src) => json!({"linkedStatus": "trapper", "linked": [src]}),
+                    // No Retreat's own: nothing is linked.
+                    None if m.volatiles.iter().any(|v| v == "noretreat") => json!({}),
                     None => json!({"linkedStatus": "trapper", "linked": []}),
                 },
                 "octolock" => json!({"source": source(id).or(foe_active.clone())}),
