@@ -189,6 +189,7 @@
     },
     "tool_files": {
       "refsim/export_format.js": "354ad99ce567aaf126e99764dc4006bdab74a57086af38d73e71e2f8500bfba0",
+      "refsim/package.json": "f0f7ba239fa46fd4e973fc40e7a88d6daca4d55ed67fe83f1d23101fbf6dbf26",
       "refsim/showdown_path.js": "72f410216902cedec4eba25766c3ed19f814450d38e4060e417fe5c1f1bbe6b8",
       "refsim/source_files.js": "0e65ddd321f5ddc401945029b9041709d81f84414332a922e64f1b550ba456eb"
     }

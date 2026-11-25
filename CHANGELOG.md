@@ -43,6 +43,11 @@ Hardening after the review of the pin sync.
   switch 3`): Showdown never records a revival in `switchIns` and accepts it (checked at the pin,
   all nine combinations of two revivals and a pass); the engine and `joint_choices` refused it.
 
+- The Node tools of `refsim/` (`export_format.js`, `source_files.js`, ...) failed with `require is
+  not defined` when the engine was vendored into a repository whose `package.json` says
+  `"type": "module"`, as the Areneon monorepo's does: `refsim/package.json` now says `commonjs` for the
+  directory (found by building the vendored engine's data from the monorepo).
+
 ### Known limitations
 
 - A `trapped` volatile with a hidden trapper on a No Retreat user is projected into a world as
