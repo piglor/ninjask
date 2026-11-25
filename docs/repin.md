@@ -126,7 +126,7 @@ python scripts/repin.py provenance check
 support (its team builder exits the worker process): list only supported ids, and kill a run that is quiet
 for minutes.
 
-The **fingerprint** (`c826ee9bb327b2d8` at 0.4.1+areneon.0) must not move in a change that preserves
+The **fingerprint** (`36adc509dbe129d1` since the N1 channels, hints and draw log; it was `c826ee9bb327b2d8` at 0.4.1+areneon.0) must not move in a change that preserves
 behaviour. A pin bump that changes behaviour a fixture game reaches moves it: say in the commit which
 changed handler moved it and that the reference check says Showdown does the same, and change it in the
 CHANGELOG, the README, CONTRIBUTING, `.github/workflows/ci.yml` and the pull request template together.
