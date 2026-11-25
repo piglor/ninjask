@@ -193,6 +193,33 @@ def test_the_record_covers_every_sim_file_and_every_mod_file_of_a_chain():
     assert [p for p in sources if repin.classify(p, mods) == "unreviewed"] == []
 
 
+@needs_showdown
+def test_the_node_tools_are_commonjs_inside_a_project_whose_package_is_a_module(tmp_path):
+    """The engine is vendored into other repositories (a git submodule). Node reads a `.js` file by the nearest
+    `package.json`, and a project that sets `"type": "module"` would make these scripts ES modules and break
+    `require`: refsim/package.json says commonjs for the directory."""
+    import os
+    import shutil
+    import subprocess
+
+    project = tmp_path / "project"
+    (project / "vendor" / "ninjask").mkdir(parents=True)
+    (project / "package.json").write_text('{"name": "enclosing", "private": true, "type": "module"}')
+    refsim = project / "vendor" / "ninjask" / "refsim"
+    shutil.copytree(REFSIM_DIR, refsim, ignore=shutil.ignore_patterns("PROVENANCE.json", "node_modules"))
+    env = {"PATH": os.environ["PATH"], "NINJASK_SHOWDOWN": str(SHOWDOWN_DIR)}
+    run = lambda tool: subprocess.run(  # noqa: E731
+        ["node", str(refsim / tool), "gen9championsvgc2026regmc"], env=env, capture_output=True, text=True, cwd=project
+    )
+    for tool in ("export_format.js", "source_files.js"):
+        done = run(tool)
+        assert done.returncode == 0, (tool, done.stderr[:300])
+    assert json.loads((refsim / "package.json").read_text())["type"] == "commonjs"
+    # Without it the enclosing project's type decides, and the tools fail: the file is what makes them work.
+    (refsim / "package.json").unlink()
+    assert "require is not defined" in run("export_format.js").stderr
+
+
 def test_the_source_lister_names_no_mod_and_no_format():
     """Mod chains come from Showdown's Dex, not from this file."""
     text = (ENGINE_ROOT / "refsim" / "source_files.js").read_text()
