@@ -40,7 +40,8 @@ else:
     Battle = _compiled.Battle
     Tracker = _compiled.Tracker
     Batch = _compiled.Batch
-    Prober = _compiled.Prober
+    # An extension that predates the declared-state layer has no Prober.
+    Prober = getattr(_compiled, "Prober", None)
     # Layouts of Tracker.encode(), encode_ids(), Battle.legal_actions() and
     # Batch.observe() (ninjask::encode).
     # The Pokémon Showdown commit the engine is a port of (refsim/SHOWDOWN_COMMIT).
