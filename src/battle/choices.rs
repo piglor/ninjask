@@ -861,7 +861,9 @@ const SLOT_OPTIONS_INLINE: usize = 48;
 /// - Revival Blessing's `switch` to a fainted teammate counts as a forced
 ///   switch (down to 0) and takes no living replacement, so the reviving
 ///   Pokémon may also pass when nobody lives on the bench.
-/// - No two parts switch to one Pokémon, and at most one part Mega Evolves.
+/// - No two parts switch to one Pokémon (two revivals may name the same fainted
+///   teammate: Showdown never records a revival in `switchIns`), and at most one
+///   part Mega Evolves.
 #[derive(Default)]
 struct JointRule {
     forced_switches: usize,
@@ -887,10 +889,14 @@ impl JointRule {
                     if to.contains(&index) {
                         return false;
                     }
-                    to.push(index);
                     if self.reviving[slot] {
+                        // A revival is never recorded in `switchIns`: two reviving slots may name
+                        // the same fainted teammate (Showdown accepts it, and heals it twice).
                         switches_left = switches_left.saturating_sub(1);
-                    } else if self.must_switch[slot] {
+                    } else {
+                        to.push(index);
+                    }
+                    if !self.reviving[slot] && self.must_switch[slot] {
                         if switches_left == 0 {
                             return false;
                         }

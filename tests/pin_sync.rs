@@ -22,7 +22,9 @@ use serde_json::Value;
 
 fn dex() -> Option<Arc<Dex>> {
     let json = common::format_export("gen9championsvgc2026regmc")?;
-    Some(Arc::new(Dex::from_json(&json).ok()?))
+    Some(Arc::new(
+        Dex::from_json(&json).expect("the format export loads"),
+    ))
 }
 
 fn mon(species: &str, ability: &str, moves: &[&str], gender: &str) -> String {
@@ -290,4 +292,77 @@ fn the_tracker_sees_no_retreat_trap_only_as_the_trapped_volatile() {
         "handed on"
     );
     assert!(!t.trap_state(1, newcomer).0, "but it traps no more");
+}
+
+/// Two Revival Blessing slots at once (a revival passed with `pass, pass` lasts to the residual, and the
+/// other reviver then uses its own). Showdown never records a revival in `switchIns`, so every combination
+/// of the two fainted teammates and a pass is accepted, the same teammate twice included (checked on the
+/// pin: all nine); the second revival heals the same Pokémon again.
+#[test]
+fn two_revival_slots_may_name_the_same_fainted_teammate() {
+    let Some(dex) = dex() else { return };
+    let fodder = [
+        mon("Pikachu", "static", &["Protect", "Teatime"], "M"),
+        mon("Dedenne", "cheekpouch", &["Protect", "Teatime"], "M"),
+    ];
+    let revivers = [
+        "Pawmot|||naturalcure|RevivalBlessing,Protect,Teatime|Jolly|0,0,0,0,0,32||||50|"
+            .to_string(),
+        "Pawmot|||naturalcure|RevivalBlessing,Protect,Teatime|Hardy||||||50|".to_string(),
+    ];
+    let t1 = [fodder.to_vec(), revivers.to_vec()].concat().join("]");
+    let t2 = [
+        "Garchomp|||roughskin|Earthquake,Protect|Adamant|0,32,0,0,0,32||||50|".to_string(),
+        mon("Corviknight", "pressure", &["Protect", "Teatime"], "F"),
+        mon("Snorlax", "thickfat", &["Protect"], "M"),
+        mon("Clefable", "magicguard", &["Protect"], "F"),
+    ]
+    .join("]");
+    let reach = |last: Option<&str>| {
+        let mut b = Battle::new(dex.clone(), [&t1, &t2], ["p1", "p2"], 11).unwrap();
+        for (s, c) in [
+            (0, "team 1234"),
+            (1, "team 1234"),
+            (0, "move 2, move 2"),
+            (1, "move 1, move 2"),
+            (0, "switch 3, switch 4"),
+            (0, "move 1, move 1"),
+            (1, "move 2, move 2"),
+            (0, "pass, pass"),
+        ] {
+            b.choose(s, c).unwrap();
+        }
+        if let Some(c) = last {
+            b.choose(0, c).unwrap();
+        }
+        b
+    };
+    let b = reach(None);
+    assert_eq!(
+        b.request_json(0).unwrap()["forceSwitch"],
+        serde_json::json!([true, true])
+    );
+    let mut legal: Vec<String> = b
+        .player_choices(0)
+        .iter()
+        .map(|c| b.choice_string(c))
+        .collect();
+    legal.sort();
+    let mut want: Vec<String> = ["switch 3", "switch 4", "pass"]
+        .iter()
+        .flat_map(|a| {
+            ["switch 3", "switch 4", "pass"]
+                .iter()
+                .map(move |c| format!("{a}, {c}"))
+        })
+        .collect();
+    want.sort();
+    assert_eq!(legal, want);
+    // The same teammate twice is played: both revivals heal it.
+    let b = reach(Some("switch 3, switch 3"));
+    let heals = log(&b)
+        .iter()
+        .filter(|l| l.starts_with("|-heal|") && l.contains("Revival Blessing"))
+        .count();
+    assert_eq!(heals, 2, "{:?}", log(&b));
 }

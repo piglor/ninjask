@@ -32,6 +32,18 @@ if [ "$(git rev-parse HEAD)" != "$COMMIT" ]; then
 	git checkout --quiet --detach "$COMMIT"
 fi
 
+# The checkout must be the pinned commit with no tracked file changed: whatever `node build`
+# compiles is the reference simulator (refsim/export_format.js checks the same before it exports).
+if [ "$(git rev-parse HEAD)" != "$COMMIT" ]; then
+	echo "$DEST is at $(git rev-parse HEAD), not the pinned $COMMIT" >&2
+	exit 1
+fi
+if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+	echo "$DEST has changed tracked files; refusing to build it:" >&2
+	git status --porcelain --untracked-files=no >&2
+	exit 1
+fi
+
 # `node build` installs dependencies (npm ci) when missing and compiles to dist/.
 node build
 echo "Pokémon Showdown ready at $DEST ($(git rev-parse --short HEAD))"

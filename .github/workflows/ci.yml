@@ -8,13 +8,18 @@ name: CI
 #      play battles read (they skip without it), all with --locked;
 #   2. the behaviour fingerprint on the fixture teams (2000 games), which
 #      must print c826ee9bb327b2d8 (README, "Run the checks");
-#   3. the exports are what refsim/PROVENANCE.json says (the pin, the export
-#      tool, a hash of every bundled format);
+#   3. the exports and the Showdown sources are what refsim/PROVENANCE.json says (the
+#      pin, the export tool, a hash of every bundled format, and of every Showdown
+#      source file those formats load and every sim/ file);
 #   4. exact agreement with pinned Showdown on 200 synthetic games, 200
 #      games of the VGCPastes pool (pools/) and 200 games that use No Retreat;
 #   5. pytest;
 # and, in their own jobs, the supply-chain policy (cargo deny: licences, sources,
 # advisories) and `fidelity`, a larger comparison with the pinned Showdown.
+#
+# Showdown is cloned and built on every run: nothing from an earlier run (a cache of its
+# checkout, which `node build` would not re-verify) is executed here. The checkouts keep
+# no credentials in .git/config.
 
 on:
   push:
@@ -27,7 +32,9 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # A newer push to a pull request replaces its running checks; a push to main is never cancelled
+  # (each commit on main keeps its own result).
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   checks:
@@ -35,6 +42,8 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Rust toolchain
         uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # pinned: rust-toolchain.toml
@@ -51,12 +60,6 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
-
-      - name: Cache the pinned Showdown checkout
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: third_party/pokemon-showdown
-          key: showdown-${{ hashFiles('refsim/SHOWDOWN_COMMIT') }}
 
       - name: Install the package (pip install -e '.[test]')
         run: |
@@ -78,7 +81,7 @@ jobs:
       - name: Rust tests
         run: cargo test --release --locked
 
-      - name: Provenance (the pin, the export tool and every exported format)
+      - name: Provenance (the pin, the export tool, every exported format and the Showdown sources)
         run: .venv/bin/python scripts/repin.py provenance check
 
       - name: Fingerprint (fixture teams, 2000 games)
@@ -104,6 +107,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: EmbarkStudios/cargo-deny-action@81891abc19297b21343b15ef67dc61e4aea74fda # v2.1.4
         with:
           command: check
@@ -117,6 +122,8 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # pinned: rust-toolchain.toml
         with:
@@ -131,12 +138,6 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
-
-      - name: Cache the pinned Showdown checkout
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: third_party/pokemon-showdown
-          key: showdown-${{ hashFiles('refsim/SHOWDOWN_COMMIT') }}
 
       - name: Install the package
         run: |

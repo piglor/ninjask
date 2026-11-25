@@ -87,12 +87,17 @@ IDLE = ("Teatime", "BodySlam", "Protect", "Detect")
 BENCH = (_set("Slowbro", "oblivious", IDLE, "M"), _set("Pikachu", "static", IDLE, "M"))
 
 
+class _ScriptDone(BaseException):
+    """Raised by a `stop` script when it runs out: everything before was compared with Showdown."""
+
+
 class _ScriptedChoices:
     """Stands in for the `random.Random` of `check_reference.play`: the scripted
-    choices first (each must be on offer), then random ones."""
+    choices first (each must be on offer), then random ones, or with `stop` the end of the play."""
 
-    def __init__(self, script):
+    def __init__(self, script, stop=False):
         self.script = list(script)
+        self.stop = stop
         self.rng = random.Random(1)
 
     def choice(self, options):
@@ -100,15 +105,20 @@ class _ScriptedChoices:
             want = self.script.pop(0)
             assert want in options, (want, options)
             return want
+        if self.stop:
+            raise _ScriptDone
         return self.rng.choice(list(options))
 
 
-def _play(t1, t2, script, seed, capsys):
-    """Play `script` then random choices on Showdown and the engine, comparing
+def _play(t1, t2, script, seed, capsys, salt="pin-sync", stop=False):
+    """Play `script` then random choices (with `stop`, nothing more) on Showdown and the engine, comparing
     after every input (a divergence raises); returns the omniscient log lines."""
     cr = _check_reference()
     with RefSim() as sim:
-        cr.play(sim, dex(cr.FORMAT), seed_from_int(seed, salt="pin-sync"), t1, t2, _ScriptedChoices(script), True)
+        try:
+            cr.play(sim, dex(cr.FORMAT), seed_from_int(seed, salt=salt), t1, t2, _ScriptedChoices(script, stop), True)
+        except _ScriptDone:
+            pass
     lines = [line.strip() for line in capsys.readouterr().out.splitlines()]
     return [line for line in lines if line.startswith("|")]
 
@@ -222,3 +232,71 @@ def test_revival_blessing_choices_are_showdowns():
         assert set(joint_choices(request)) == set(battle.legal_choices(side))
         obs = sd.choose(side, fixture["showdown_accepted"])
         assert obs.errors[side] is None
+
+
+# ---------------------------------------------------------------------------
+# Two Revival Blessing slots at once (found by the review of the pin sync)
+
+
+def _mon(name, species, ability, moves, nature="Hardy", evs=""):
+    return f"{name}|{species}||{ability}|{','.join(moves)}|{nature}|{evs}||||50|"
+
+
+# Two fodder leads that Earthquake faints, two revivers on the bench. Both revivers use Revival
+# Blessing in one turn: the faster passes its revival (`pass, pass`: nobody lives on the bench), the
+# slower then uses its own, and the request has both slots reviving.
+REVIVERS_1 = _team(
+    _mon("Fodder1", "Pikachu", "static", ("Protect", "Teatime")),
+    _mon("Fodder2", "Dedenne", "cheekpouch", ("Protect", "Teatime")),
+    _mon("Reviver1", "Pawmot", "naturalcure", ("RevivalBlessing", "Protect", "Teatime"), "Jolly", "0,0,0,0,0,32"),
+    _mon("Reviver2", "Pawmot", "naturalcure", ("RevivalBlessing", "Protect", "Teatime")),
+)
+REVIVERS_2 = _team(
+    _mon("Chomp", "Garchomp", "roughskin", ("Earthquake", "Protect"), "Adamant", "0,32,0,0,0,32"),
+    _mon("Corv", "Corviknight", "pressure", ("Protect", "Teatime")),
+    _mon("Snor", "Snorlax", "thickfat", ("Protect",)),
+    _mon("Clef", "Clefable", "magicguard", ("Protect",)),
+)
+# The script is consumed in the order the requests come: after p1's forced switch the turn starts and p2 chooses
+# before p1 does.
+TWO_REVIVERS = ["team 1234", "team 1234", "move 2, move 2", "move 1, move 2", "switch 3, switch 4", "move 2, move 2", "move 1, move 1", "pass, pass"]
+
+
+@needs_showdown
+@pytest.mark.parametrize("target", ["switch 3, switch 3", "switch 4, switch 4", "switch 3, switch 4", "pass, switch 4"])
+def test_two_revivers_choose_like_showdown(target, capsys):
+    """Showdown never records a revival in `switchIns`, so two reviving slots may name the same fainted
+    teammate: it accepts `switch 3, switch 3` (checked on the pin with all nine combinations), and the second
+    revival heals again. The engine plays it as Showdown does, input for input."""
+    log = _play(REVIVERS_1, REVIVERS_2, [*TWO_REVIVERS, target], 11, capsys, salt="two", stop=True)
+    start = log.index("|move|p1a: Reviver1|Revival Blessing|p1a: Reviver1")
+    heals = [line for line in log[start:] if line.startswith("|-heal|") and "Revival Blessing" in line]
+    assert len(heals) == (1 if target.startswith("pass") else 2), log[start:]
+    if target in ("switch 3, switch 3", "switch 4, switch 4"):
+        assert heals[0] == heals[1]  # the same teammate is healed twice, as Showdown does
+
+
+@needs_showdown
+def test_two_revivers_request_lists_what_showdown_accepts():
+    cr = _check_reference()
+    with RefSim() as sim:
+        battle = Battle(sim, cr.FORMAT, seed_from_int(11, "two"), ("A", REVIVERS_1), ("B", REVIVERS_2))
+        obs = battle.start()
+        sd_req = None
+        engine = ninjask.Battle.reference(dex(cr.FORMAT), REVIVERS_1, REVIVERS_2, seed_from_int(11, "two"))
+        engine.set_logging(True)
+        steps = [("p1", "team 1234"), ("p2", "team 1234"), ("p1", "move 2, move 2"), ("p2", "move 1, move 2"), ("p1", "switch 3, switch 4"),
+                 ("p1", "move 1, move 1"), ("p2", "move 2, move 2"), ("p1", "pass, pass")]
+        for side, choice in steps:
+            obs = battle.choose(side, choice)
+            assert obs.errors[side] is None, (side, choice, obs.errors[side])
+            engine.choose(side, choice)
+        sd_req = obs.requests["p1"]
+        assert sd_req["forceSwitch"] == [True, True] and [p.get("reviving") for p in sd_req["side"]["pokemon"]][:2] == [True, True]
+        listed = set(joint_choices(sd_req))
+        assert listed == set(engine.legal_choices("p1"))
+        # Showdown accepts exactly the nine combinations of {switch 3, switch 4, pass} x the same: nothing
+        # is refused, so every combination must be listed. (Each probe is a fresh battle: an undo of a
+        # revival leaves its switch flag cleared.)
+        assert len(listed) == 9
+        assert {"switch 3, switch 3", "switch 4, switch 4"} <= listed

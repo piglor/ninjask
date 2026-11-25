@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Put the data an installed wheel needs into the package, python/ninjask/data/,
-# before building it (the release workflow runs this): each format's export
+# before building it (run it by hand before `maturin build`; this fork has no
+# release workflow): each format's export
 # from the pinned Showdown (scripts/setup_showdown.sh first), and the fixture
 # teams. The files are generated, so git ignores them; pyproject.toml's
 # [tool.maturin] include puts them in the wheel and the sdist.

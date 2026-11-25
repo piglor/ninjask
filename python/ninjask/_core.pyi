@@ -48,8 +48,11 @@ class Dex:
     """A loaded format: species, moves, items, abilities and support levels."""
 
     @staticmethod
-    def load(path: str) -> Dex:
-        """Load an export written by refsim/export_format.js."""
+    def load(path: str, *, allow_unpinned: bool = False) -> Dex:
+        """Load an export written by refsim/export_format.js. It must be from the Showdown
+        commit the engine is a port of (`SHOWDOWN_COMMIT`): an export of another commit, or one
+        that names none, raises `ValueError` unless `allow_unpinned` is set (a hand-made export,
+        or one of another commit that you have checked)."""
     @property
     def format_id(self) -> str: ...
     def team_problems(self, packed: str) -> list[str]:

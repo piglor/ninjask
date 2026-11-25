@@ -6,7 +6,7 @@ from ninjask import Battle, Dex, EnumerationMode, Outcome, BattleStateKey
 
 @pytest.fixture
 def battle():
-    dex = Dex.load(str(Path(__file__).parents[1] / "fixtures" / "enumeration.json"))
+    dex = Dex.load(str(Path(__file__).parents[1] / "fixtures" / "enumeration.json"), allow_unpinned=True)
     b = Battle(dex, "Fast|||battlearmor|Tackle,Splash|Hardy|||||50|",
                "Slow|||battlearmor|Splash|Hardy|||||50|", 1)
     b.choose("p1", "team 1")
@@ -54,7 +54,7 @@ def test_accuracy_and_crit_probabilities(mode, tmp_path):
     spec["moves"][0]["accuracy"] = 75
     fixture = tmp_path / "accuracy.json"
     fixture.write_text(json.dumps(spec))
-    dex = Dex.load(str(fixture))
+    dex = Dex.load(str(fixture), allow_unpinned=True)  # hand-made: names no commit
     b = Battle(dex, "Fast|||noability|Tackle|Hardy|||||50|",
                "Slow|||noability|Splash|Hardy|||||50|", 1)
     b.choose("p1", "team 1")

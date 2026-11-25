@@ -3,7 +3,7 @@ use ninjask::{Battle, Dex};
 use std::{collections::HashSet, sync::Arc};
 fn battle() -> Battle {
     Battle::skeleton(
-        Arc::new(Dex::from_json(include_str!("fixtures/enumeration.json")).unwrap()),
+        Arc::new(Dex::from_json_unpinned(include_str!("fixtures/enumeration.json")).unwrap()),
         ["a", "b"],
         1,
     )

@@ -15,73 +15,17 @@
 'use strict';
 
 const path = require('path');
-const PS = require('./showdown_path').showdownPath();
+const { showdownPath, sourceCommit, resolveFormat } = require('./showdown_path');
+const PS = showdownPath();
 const { Dex, TeamValidator, toID } = require(path.join(PS, 'dist', 'sim'));
-const { Format } = require(path.join(PS, 'dist', 'sim', 'dex-formats'));
-
-/**
- * The commit this export is from. The pin (refsim/SHOWDOWN_COMMIT) is the
- * contract: the checkout must be at it, with no tracked file changed, or the
- * data would not be the pinned Showdown's whatever it says. NINJASK_ALLOW_UNPINNED=1
- * exports any checkout (a candidate pin, an older one to diff against) and
- * records the commit it really is; such an export fails the provenance check.
- */
-function sourceCommit() {
-	const { execFileSync } = require('child_process');
-	const pin = require('fs').readFileSync(path.resolve(__dirname, 'SHOWDOWN_COMMIT'), 'utf8').trim();
-	const git = args => execFileSync('git', ['-C', PS, ...args], { encoding: 'utf8' }).trim();
-	let head, dirty;
-	try {
-		head = git(['rev-parse', 'HEAD']);
-		dirty = git(['status', '--porcelain', '--untracked-files=no']);
-	} catch (e) {
-		throw new Error(`cannot read the commit of the Showdown checkout at ${PS}: ${e.message}`);
-	}
-	if (process.env.NINJASK_ALLOW_UNPINNED === '1') return head;
-	if (head !== pin) {
-		throw new Error(`the Showdown checkout is at ${head}, the pin is ${pin} (scripts/setup_showdown.sh, or NINJASK_ALLOW_UNPINNED=1 to export it anyway)`);
-	}
-	if (dirty) throw new Error(`the Showdown checkout at ${PS} has changed tracked files:\n${dirty}`);
-	return head;
-}
 
 const formatId = process.argv[2];
 if (!formatId) {
 	console.error('usage: export_format.js <formatid>');
 	process.exit(2);
 }
-// Format ids Showdown does not define, derived from a base format by
-// swapping a ruleset entry. PKMN Arena's open-team-sheets ladder for Reg M-C
-// is the base format with sheets forced open; Showdown's own spelling of
-// that swap is its Bo3 format, which also adds "Best of = 3", so the arena
-// format is derived here instead. Legality and game data are the base
-// format's; only the sheet rule (and the recorded `derivedFrom`) differ.
-const DERIVED_FORMATS = {
-	gen9championsvgc2026regmcots: {
-		base: 'gen9championsvgc2026regmc',
-		swap: ['Open Team Sheets', 'Force Open Team Sheets'],
-	},
-};
-let format = Dex.formats.get(formatId, true);
-let derivedFrom = null;
-if (!format.exists && DERIVED_FORMATS[formatId]) {
-	const { base: baseId, swap: [from, to] } = DERIVED_FORMATS[formatId];
-	const base = Dex.formats.get(baseId, true);
-	if (!base.exists) throw new Error(`unknown base format ${baseId}`);
-	if (!base.ruleset.includes(from)) throw new Error(`${baseId} has no "${from}" rule to swap`);
-	format = new Format({
-		id: formatId,
-		// The base format's name: PKMN Arena's open-sheets games print it in
-		// their |tier| line, as Showdown does when it shows the sheets.
-		name: base.name,
-		mod: base.mod,
-		effectType: 'Format',
-		gameType: base.gameType,
-		ruleset: base.ruleset.map(r => (r === from ? to : r)),
-	});
-	derivedFrom = baseId;
-}
-if (!format.exists) throw new Error(`unknown format ${formatId}`);
+// The format, or the base format it derives from by a ruleset swap (showdown_path.js).
+const { format, derivedFrom } = resolveFormat(PS, formatId);
 const dex = Dex.forFormat(format);
 const ruleTable = Dex.formats.getRuleTable(format);
 const validator = TeamValidator.get(format);
@@ -277,7 +221,7 @@ const out = {
 		adjustLevel: ruleTable.adjustLevel,
 		maxTeamSize: ruleTable.maxTeamSize,
 		minTeamSize: ruleTable.minTeamSize,
-		showdownCommit: sourceCommit(),
+		showdownCommit: sourceCommit(PS),
 	},
 	species,
 	learnsets,

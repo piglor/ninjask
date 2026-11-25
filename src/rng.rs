@@ -454,8 +454,9 @@ mod enumeration_tests {
     fn damage_endpoints_never_calls_a_prng() {
         use crate::{Battle, Dex};
         use std::sync::Arc;
-        let dex =
-            Arc::new(Dex::from_json(include_str!("../tests/fixtures/enumeration.json")).unwrap());
+        let dex = Arc::new(
+            Dex::from_json_unpinned(include_str!("../tests/fixtures/enumeration.json")).unwrap(),
+        );
         let team = "Fast|||battlearmor|Tackle,Double Hit|Hardy|||||50|";
         let mut battle = Battle::new(
             dex,

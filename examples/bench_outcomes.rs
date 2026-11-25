@@ -23,7 +23,9 @@ fn measure(
 }
 
 fn main() {
-    let dex = Arc::new(Dex::from_json(include_str!("../tests/fixtures/enumeration.json")).unwrap());
+    let dex = Arc::new(
+        Dex::from_json_unpinned(include_str!("../tests/fixtures/enumeration.json")).unwrap(),
+    );
     let mut b = Battle::new(
         dex,
         [
