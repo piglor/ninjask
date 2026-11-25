@@ -10,6 +10,8 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import random
+import re
 
 import pytest
 
@@ -257,3 +259,109 @@ def test_a_channel_forgets_what_the_reader_has_taken():
     plain.reset(0, row["packed"]["p1"], row["packed"]["p2"], row["seed"])
     with pytest.raises(ValueError, match="channels"):
         plain.discard_channel(0, "p1", 1)
+
+
+# ---- hidden information ----------------------------------------------------------------------------------------
+#
+# A player's channel is what that player may see: no other player's request or error, no exact hit points of the other
+# side's Pokémon (a percentage out of 100), no split marker. The omniscient log is the opposite: both sides' exact
+# values, and no request or error line at all (they are the players'). The canary below scans fresh battles for any
+# line that breaks this, and shows with negative controls that it would see one.
+
+HP_LINES = re.compile(r"^\|(?:switch|drag|replace|-damage|-heal|-sethp)\|(p[12])[ab]?: [^|]*\|(?:[^|]*\|)?(\d+)/(\d+)")
+
+
+def hidden_information_leaks(channels: dict[str, list[str]], viewers=("p1", "p2")) -> list[str]:
+    """What `channels` (`p1`, `p2`, `omniscient`; lines) shows that its reader must not see. `viewers` names the
+    channels to treat as player channels (the control hands it the omniscient log as one)."""
+    leaks = []
+    for line in channels.get("omniscient", []):
+        if line.startswith("|request|"):
+            leaks.append(f"omniscient: a request line: {line[:60]}")
+        if line.startswith("|error|"):
+            leaks.append(f"omniscient: an error line: {line[:60]}")
+    for me in viewers:
+        other = "p2" if me == "p1" else "p1"
+        for line in channels[me]:
+            if line.startswith("|request|"):
+                side = json.loads(line[len("|request|"):])["side"]["id"]
+                if side != me:
+                    leaks.append(f"{me}: the request of {side}")
+            if line.startswith("|split|"):
+                leaks.append(f"{me}: a split marker")
+            m = HP_LINES.match(line)
+            if m and m.group(1) == other and m.group(3) != "100":
+                leaks.append(f"{me}: the exact hit points of {other}: {line[:80]}")
+    return leaks
+
+
+def fresh_channels(seed_base: int, mode: str, battles_n: int = 24):
+    """Fresh battles on generated teams, played by a policy that picks any candidate (`random`) or a pending one first
+    (`pending-first`, which provokes the refusals): every battle's three channels."""
+    from n1_fixtures import teams
+
+    rnd = random.Random(seed_base)
+    pool = teams()
+    batch = ninjask.Batch(dex(), battles_n, names=NAMES, channels=True)
+    batch.reset_many(
+        list(range(battles_n)),
+        [pool[rnd.randrange(len(pool))] for _ in range(battles_n)],
+        [pool[rnd.randrange(len(pool))] for _ in range(battles_n)],
+        [f"sodium,{seed_base * 1000003 + i + 1:032x}" for i in range(battles_n)],
+    )
+    for _ in range(400):
+        pending = batch.pending()
+        if not pending:
+            break
+        picks = []
+        for i, side in pending:
+            candidates = batch.candidates(i, side)
+            if mode == "pending-first":
+                pool_idx = [k for k, (_, p) in enumerate(candidates) if p] or list(range(len(candidates)))
+            else:
+                pool_idx = list(range(len(candidates)))
+            picks.append((i, side, rnd.choice(pool_idx)))
+        batch.choose_candidates(picks)
+    return [{v: batch.channel(i, v) for v in VIEWERS} for i in range(battles_n)]
+
+
+@pytest.mark.parametrize("mode", ["random", "pending-first"])
+def test_no_channel_shows_what_its_reader_must_not_see(mode):
+    games = fresh_channels(11, mode)
+    assert games == fresh_channels(11, mode), "the same seeds must give the same channels"
+    seen_request = 0
+    for i, channels in enumerate(games):
+        assert hidden_information_leaks(channels) == [], (mode, i)
+        seen_request += sum(l.startswith("|request|") for l in channels["p1"] + channels["p2"])
+        # a player's channel is the omniscient log with the sheets and the opponent's exact values taken out: one
+        # line for one line, apart from the requests and errors only it has and the two sheet prompts it lacks
+        for me in ("p1", "p2"):
+            own = [l for l in channels[me] if not l.startswith(("|request|", "|error|"))]
+            assert len(own) == len(channels["omniscient"]) - 2, (mode, i, me)
+    assert seen_request > 0
+
+
+def test_the_recorded_battles_pass_the_canary_too():
+    errors = 0
+    for row in battles():
+        channels = {"p1": row["channels"]["p1"], "p2": row["channels"]["p2"], "omniscient": row["omniscient"]}
+        assert hidden_information_leaks(channels) == [], row["id"]
+        errors += sum(l.startswith("|error|") for l in channels["p1"] + channels["p2"])
+    assert errors > 0, "the recorded battles hold refusals, whose error lines belong to the players' channels"
+
+
+def test_the_canary_sees_what_it_is_for():
+    """Negative controls: the check flags each kind of leak it names, so a clean result means something."""
+    channels = fresh_channels(11, "random", 4)[0]
+    assert hidden_information_leaks(channels) == []
+    # the omniscient log read as player 1's channel: the opponent's exact hit points
+    leaky = dict(channels, p1=channels["omniscient"])
+    assert any("exact hit points of p2" in l for l in hidden_information_leaks(leaky))
+    # the other player's request in a channel
+    foreign = next(l for l in channels["p2"] if l.startswith("|request|"))
+    assert any("the request of p2" in l for l in hidden_information_leaks(dict(channels, p1=channels["p1"] + [foreign])))
+    # a request or an error line in the omniscient log
+    assert any("a request line" in l for l in hidden_information_leaks(dict(channels, omniscient=channels["omniscient"] + [foreign])))
+    assert any("an error line" in l for l in hidden_information_leaks(dict(channels, omniscient=channels["omniscient"] + ["|error|[Invalid choice] x"])))
+    # a split marker that was not resolved
+    assert any("split marker" in l for l in hidden_information_leaks(dict(channels, p1=channels["p1"] + ["|split|p2"])))
