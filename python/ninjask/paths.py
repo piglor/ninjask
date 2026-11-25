@@ -32,6 +32,8 @@ from pathlib import Path
 ENGINE_ROOT = Path(__file__).resolve().parents[2]
 REFSIM_DIR = ENGINE_ROOT / "refsim"
 IN_CHECKOUT = (REFSIM_DIR / "SHOWDOWN_COMMIT").is_file()
+# The Showdown commit this checkout is pinned to (refsim/SHOWDOWN_COMMIT); None in an installed wheel.
+SHOWDOWN_COMMIT = (REFSIM_DIR / "SHOWDOWN_COMMIT").read_text().strip() if IN_CHECKOUT else None
 # The data bundled into a built wheel (scripts/bundle_data.sh)
 PACKAGE_DATA = Path(__file__).resolve().parent / "data"
 FIXTURE_POOL = (

@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import subprocess
 from dataclasses import dataclass, field
 from functools import cached_property, lru_cache
 from pathlib import Path
 
 from ninjask.ids import to_id
-from ninjask.paths import FORMAT_DIR, PACKAGE_DATA, REFSIM_DIR, node_env, require_checkout
+from ninjask.paths import FORMAT_DIR, IN_CHECKOUT, PACKAGE_DATA, REFSIM_DIR, SHOWDOWN_COMMIT, node_env, require_checkout
 
 CACHE = FORMAT_DIR
 BUNDLED = PACKAGE_DATA / "formats"
@@ -103,13 +104,24 @@ class FormatSpec:
         return value
 
 
+def export_commit(path: Path) -> str | None:
+    """The Showdown commit an export says it is from (`format.showdownCommit`, written
+    near the start of the file), or None."""
+    with path.open("rb") as f:
+        head = f.read(16384).decode("utf-8", "replace")
+    found = re.search(r'"showdownCommit":"([0-9a-f]{40})"', head)
+    return found.group(1) if found else None
+
+
 def export_path(format_id: str, refresh: bool = False) -> Path:
-    """The format's export: the one in `CACHE`, else the copy bundled with an
-    installed wheel, else exported from Showdown into `CACHE` now (or always,
-    with `refresh`)."""
+    """The format's export: the one in `CACHE` (made from this checkout's pin: one from
+    another commit is exported again), else the copy bundled with an installed wheel, else
+    exported from Showdown into `CACHE` now (or always, with `refresh`)."""
     path = CACHE / f"{format_id}.json"
     if not refresh:
-        if path.exists():
+        # A cached export that names another commit than the pin is stale. (One that names none is
+        # not an export of `export_format.js`, which always does: a hand-made file is taken as it is.)
+        if path.exists() and (not IN_CHECKOUT or export_commit(path) in (None, SHOWDOWN_COMMIT)):
             return path
         if (bundled := BUNDLED / f"{format_id}.json").exists():
             return bundled

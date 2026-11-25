@@ -83,7 +83,8 @@ def _team(*mons):
 
 
 IDLE = ("Teatime", "BodySlam", "Protect", "Detect")
-BENCH = (_set("Snorlax", "thickfat", IDLE, "M"), _set("Clefable", "magicguard", IDLE, "F"))
+# Species differ within a team: the projection names a Pokémon by its side and species.
+BENCH = (_set("Slowbro", "oblivious", IDLE, "M"), _set("Pikachu", "static", IDLE, "M"))
 
 
 class _ScriptedChoices:
@@ -194,6 +195,10 @@ def test_revival_blessing_request_can_pass_when_the_bench_has_no_living_pokemon(
     assert legal == ["pass, switch 3", "pass, switch 4", "pass, pass"]
     assert joint_choices(request) == legal
     battle.choose(side, fixture["showdown_accepted"])  # accepted, as Showdown accepts it
+    # Showdown asks again: the revival lasts to the turn's residual. Then p2 revives.
+    assert json.loads(battle.request(side))["forceSwitch"] == [False, True]
+    for who, choice in fixture["then"]:
+        battle.choose(who, choice)
 
 
 @needs_showdown

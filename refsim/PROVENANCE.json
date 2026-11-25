@@ -1,0 +1,184 @@
+{
+  "export": {
+    "formats": {
+      "gen9championsdoublescustomgame": {
+        "bytes": 786158,
+        "sections": {
+          "abilities": {
+            "count": 226,
+            "sha256": "be7e448c7298c3adf86e8e43197e9243f7171a842fd66f372668420c4465856a"
+          },
+          "conditions": {
+            "count": 111,
+            "sha256": "7ada19d3a5f63876f68ee4ce43371c65e9818aea6d6f9a1239b2adac3913897f"
+          },
+          "format": {
+            "count": 13,
+            "sha256": "440ce024ed6937217899327aac73af0fe35d9a9856fdd3ebcdfc8231617a229b"
+          },
+          "items": {
+            "count": 166,
+            "sha256": "fe1ee36512ac2fc12210e085cde9264000097e60b5b27f7cfdd616470601c606"
+          },
+          "learnsets": {
+            "count": 293,
+            "sha256": "c72bed428f5d46dba6631a13ff56913fa8c223c5d4efc2ba0847566be48c10d3"
+          },
+          "moves": {
+            "count": 510,
+            "sha256": "93ef5c5658db55a9ca4ad5c41809fddc54c51de28d217c2a896db85c70178e67"
+          },
+          "natures": {
+            "count": 25,
+            "sha256": "3ec5547dfcd3727ad3a395dde207efb2d488e30cc465d130ecd35ea41f167ab6"
+          },
+          "species": {
+            "count": 392,
+            "sha256": "afd76a31ea3b99b9615085232fb16fe42dff114db8647012800e289080ff8431"
+          },
+          "typechart": {
+            "count": 19,
+            "sha256": "10f9e1307a118c9b4048c2ada928eb67bc156044b69ce5226dc9eef9b822cb5c"
+          }
+        },
+        "sha256": "407309c240c13bc5e99f3d3467d79382ba449e9e847680bf997bcaf16346265f"
+      },
+      "gen9championsvgc2026regmb": {
+        "bytes": 735162,
+        "sections": {
+          "abilities": {
+            "count": 209,
+            "sha256": "e365b1cec25c7ddb46bd491fcafe07b01a62588a448eceabf29e77aa9f6cae30"
+          },
+          "conditions": {
+            "count": 108,
+            "sha256": "1dd6bf76b5c207ee8b0401829fa558421ffb5a42a9b5f52982c564ff485a41d8"
+          },
+          "format": {
+            "count": 13,
+            "sha256": "8876ff9b81f58adb5fb6752aa71cf7b7d2d593416a7ebaeab6e27afde771baf9"
+          },
+          "items": {
+            "count": 148,
+            "sha256": "649b6f58fc811b8fd28ca01c6ec662111aa4a03d18453d83c3260799db5a0fc0"
+          },
+          "learnsets": {
+            "count": 264,
+            "sha256": "af963f22f99c1aa88a2cf44f4f0956b874f4f16c206ec8abb1c15cddd2baa493"
+          },
+          "moves": {
+            "count": 496,
+            "sha256": "809627dcfc6bc2b65bce10f632746d9d45700c5150400ca9e99e4104ee2de102"
+          },
+          "natures": {
+            "count": 25,
+            "sha256": "3ec5547dfcd3727ad3a395dde207efb2d488e30cc465d130ecd35ea41f167ab6"
+          },
+          "species": {
+            "count": 355,
+            "sha256": "8bbe269eae6aab88e514312f0c51b965f7aabff46b40bbd4ffd139bd56160199"
+          },
+          "typechart": {
+            "count": 19,
+            "sha256": "10f9e1307a118c9b4048c2ada928eb67bc156044b69ce5226dc9eef9b822cb5c"
+          }
+        },
+        "sha256": "508c9605e747fbe77b878b61eaceeead21f5c2131e464e430b38a285c7671b48"
+      },
+      "gen9championsvgc2026regmc": {
+        "bytes": 786010,
+        "sections": {
+          "abilities": {
+            "count": 224,
+            "sha256": "a33f50298d42b951918f8677c1a808ed560e077e5d00e543003044b6acc1a956"
+          },
+          "conditions": {
+            "count": 111,
+            "sha256": "7ada19d3a5f63876f68ee4ce43371c65e9818aea6d6f9a1239b2adac3913897f"
+          },
+          "format": {
+            "count": 13,
+            "sha256": "b779df41acbbb00bfc4603af92d469e37b8a0f6918f910d2cf3e0551635e7be6"
+          },
+          "items": {
+            "count": 166,
+            "sha256": "fe1ee36512ac2fc12210e085cde9264000097e60b5b27f7cfdd616470601c606"
+          },
+          "learnsets": {
+            "count": 293,
+            "sha256": "c72bed428f5d46dba6631a13ff56913fa8c223c5d4efc2ba0847566be48c10d3"
+          },
+          "moves": {
+            "count": 510,
+            "sha256": "93ef5c5658db55a9ca4ad5c41809fddc54c51de28d217c2a896db85c70178e67"
+          },
+          "natures": {
+            "count": 25,
+            "sha256": "3ec5547dfcd3727ad3a395dde207efb2d488e30cc465d130ecd35ea41f167ab6"
+          },
+          "species": {
+            "count": 390,
+            "sha256": "0913f01b4377d15ef47716f89ce9e4b4321cadeaf8e254fd4c4bae7f1deafd82"
+          },
+          "typechart": {
+            "count": 19,
+            "sha256": "10f9e1307a118c9b4048c2ada928eb67bc156044b69ce5226dc9eef9b822cb5c"
+          }
+        },
+        "sha256": "7c4f76098e58f665a8c30b7946ce0f236855801696dd36500916278de61ebc3d"
+      },
+      "gen9championsvgc2026regmcots": {
+        "bytes": 786060,
+        "sections": {
+          "abilities": {
+            "count": 224,
+            "sha256": "a33f50298d42b951918f8677c1a808ed560e077e5d00e543003044b6acc1a956"
+          },
+          "conditions": {
+            "count": 111,
+            "sha256": "7ada19d3a5f63876f68ee4ce43371c65e9818aea6d6f9a1239b2adac3913897f"
+          },
+          "format": {
+            "count": 14,
+            "sha256": "ed86104c80a50b8e3279cdf01c15d66b9e6a56d26148fc82db81ef14157dbb49"
+          },
+          "items": {
+            "count": 166,
+            "sha256": "fe1ee36512ac2fc12210e085cde9264000097e60b5b27f7cfdd616470601c606"
+          },
+          "learnsets": {
+            "count": 293,
+            "sha256": "c72bed428f5d46dba6631a13ff56913fa8c223c5d4efc2ba0847566be48c10d3"
+          },
+          "moves": {
+            "count": 510,
+            "sha256": "93ef5c5658db55a9ca4ad5c41809fddc54c51de28d217c2a896db85c70178e67"
+          },
+          "natures": {
+            "count": 25,
+            "sha256": "3ec5547dfcd3727ad3a395dde207efb2d488e30cc465d130ecd35ea41f167ab6"
+          },
+          "species": {
+            "count": 390,
+            "sha256": "0913f01b4377d15ef47716f89ce9e4b4321cadeaf8e254fd4c4bae7f1deafd82"
+          },
+          "typechart": {
+            "count": 19,
+            "sha256": "10f9e1307a118c9b4048c2ada928eb67bc156044b69ce5226dc9eef9b822cb5c"
+          }
+        },
+        "sha256": "241993a39d90e4af6e867dd28c9e12692b40215586bde144adbe09175b2e8633"
+      }
+    },
+    "tool_files": {
+      "refsim/export_format.js": "93b59f84edcac954b05e3d510c15be3ae63e49dc668cfa821a29eb00a44c91f7",
+      "refsim/showdown_path.js": "7973e680178efe6f6750fa90907c8010929d952d87c19a3290ea35f55ae517b7"
+    }
+  },
+  "schema": 1,
+  "showdown": {
+    "commit": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+    "previous_pins": [],
+    "repository": "https://github.com/smogon/pokemon-showdown"
+  }
+}

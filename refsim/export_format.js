@@ -19,6 +19,32 @@ const PS = require('./showdown_path').showdownPath();
 const { Dex, TeamValidator, toID } = require(path.join(PS, 'dist', 'sim'));
 const { Format } = require(path.join(PS, 'dist', 'sim', 'dex-formats'));
 
+/**
+ * The commit this export is from. The pin (refsim/SHOWDOWN_COMMIT) is the
+ * contract: the checkout must be at it, with no tracked file changed, or the
+ * data would not be the pinned Showdown's whatever it says. NINJASK_ALLOW_UNPINNED=1
+ * exports any checkout (a candidate pin, an older one to diff against) and
+ * records the commit it really is; such an export fails the provenance check.
+ */
+function sourceCommit() {
+	const { execFileSync } = require('child_process');
+	const pin = require('fs').readFileSync(path.resolve(__dirname, 'SHOWDOWN_COMMIT'), 'utf8').trim();
+	const git = args => execFileSync('git', ['-C', PS, ...args], { encoding: 'utf8' }).trim();
+	let head, dirty;
+	try {
+		head = git(['rev-parse', 'HEAD']);
+		dirty = git(['status', '--porcelain', '--untracked-files=no']);
+	} catch (e) {
+		throw new Error(`cannot read the commit of the Showdown checkout at ${PS}: ${e.message}`);
+	}
+	if (process.env.NINJASK_ALLOW_UNPINNED === '1') return head;
+	if (head !== pin) {
+		throw new Error(`the Showdown checkout is at ${head}, the pin is ${pin} (scripts/setup_showdown.sh, or NINJASK_ALLOW_UNPINNED=1 to export it anyway)`);
+	}
+	if (dirty) throw new Error(`the Showdown checkout at ${PS} has changed tracked files:\n${dirty}`);
+	return head;
+}
+
 const formatId = process.argv[2];
 if (!formatId) {
 	console.error('usage: export_format.js <formatid>');
@@ -104,6 +130,23 @@ function callbacks(entry) {
 	return [...new Set(out)].sort();
 }
 
+/**
+ * A hash (SHA-256, first 16 hex digits) of the source of each callback `callbacks` lists. The
+ * engine ports Showdown's handlers, which an export cannot carry; their names say little (a
+ * handler can change its body and keep its name: Showdown d12b9c1e9 did for No Retreat's
+ * onStart), so a pin bump's diff of the exports shows every entity whose handler text moved.
+ */
+function callbackHashes(entry) {
+	const crypto = require('crypto');
+	const out = {};
+	for (const name of callbacks(entry)) {
+		const fn = name.split('.').reduce((o, k) => (o === undefined || o === null ? undefined : o[k]), entry);
+		if (typeof fn !== 'function') throw new Error(`callback ${name} of ${entry.id} is not a function`);
+		out[name] = crypto.createHash('sha256').update(fn.toString()).digest('hex').slice(0, 16);
+	}
+	return out;
+}
+
 function plain(obj, keys) {
 	const out = {};
 	for (const k of keys) if (obj[k] !== undefined && obj[k] !== null && obj[k] !== '') out[k] = obj[k];
@@ -167,7 +210,7 @@ function dataFields(entry) {
 
 const moves = [...moveIds].sort().map(id => {
 	const m = dex.moves.get(id);
-	const out = { ...dataFields(m), id, callbacks: callbacks(m), coreRef: coreIds.has(id) };
+	const out = { ...dataFields(m), id, callbacks: callbacks(m), callbackHashes: callbackHashes(m), coreRef: coreIds.has(id) };
 	// Status moves ignore type immunity by default; an explicit false (Thunder Wave) matters.
 	if (m.category === 'Status' && m.ignoreImmunity === false) out.ignoreImmunity = false;
 	return out;
@@ -176,7 +219,7 @@ const moves = [...moveIds].sort().map(id => {
 const items = [];
 for (const it of dex.items.all()) {
 	if (it.isNonstandard || ruleTable.isBanned(`item:${it.id}`)) continue;
-	items.push({ ...dataFields(it), id: it.id, callbacks: callbacks(it), coreRef: coreIds.has(it.id) });
+	items.push({ ...dataFields(it), id: it.id, callbacks: callbacks(it), callbackHashes: callbackHashes(it), coreRef: coreIds.has(it.id) });
 }
 
 const abilityIds = new Set();
@@ -189,7 +232,7 @@ const given = Object.entries(movesGive)
 	.map(([, id]) => id);
 const abilities = [...[...abilityIds].sort(), ...given].map(id => {
 	const a = dex.abilities.get(id);
-	return { ...dataFields(a), id, callbacks: callbacks(a), coreRef: coreIds.has(id) };
+	return { ...dataFields(a), id, callbacks: callbacks(a), callbackHashes: callbackHashes(a), coreRef: coreIds.has(id) };
 });
 
 const natures = {};
@@ -210,11 +253,11 @@ for (const [rule, source] of ruleTable) rules.push({ rule, source: source || nul
 const conditions = {};
 for (const id of Object.keys(dex.data.Conditions)) {
 	const c = dex.conditions.getByID(id);
-	if (c.exists) conditions[id] = { ...dataFields(c), id, callbacks: callbacks(c) };
+	if (c.exists) conditions[id] = { ...dataFields(c), id, callbacks: callbacks(c), callbackHashes: callbackHashes(c) };
 }
 for (const m of moves) {
 	const c = dex.moves.get(m.id).condition;
-	if (c) conditions[m.id] = { ...dataFields(c), id: m.id, callbacks: callbacks(c) };
+	if (c) conditions[m.id] = { ...dataFields(c), id: m.id, callbacks: callbacks(c), callbackHashes: callbackHashes(c) };
 }
 
 const out = {
@@ -234,7 +277,7 @@ const out = {
 		adjustLevel: ruleTable.adjustLevel,
 		maxTeamSize: ruleTable.maxTeamSize,
 		minTeamSize: ruleTable.minTeamSize,
-		showdownCommit: require('fs').readFileSync(path.resolve(__dirname, 'SHOWDOWN_COMMIT'), 'utf8').trim(),
+		showdownCommit: sourceCommit(),
 	},
 	species,
 	learnsets,

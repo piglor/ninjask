@@ -3,9 +3,26 @@ NOTICE
 This engine's own code is licensed under the MIT License (see LICENSE).
 It contains and depends on the following third-party work.
 
+Ninjask (upstream of this fork)
+-------------------------------
+https://github.com/dcabatin/Ninjask, version 0.4.1, commit 8a59175f3915771285cd16fce5d7f788610ff242
+Copyright (c) 2026 David Cabatingan and contributors, MIT License (LICENSE).
+
+This repository is the Areneon fork of that project (https://github.com/piglor/ninjask).
+The fork keeps the licence and this notice, and the upstream copyright stays with its
+authors. What the fork changes (CHANGELOG.md, "0.4.1+areneon.0"): it is pinned to a
+later Pokémon Showdown commit than upstream's, with that commit's Champions No Retreat
+behaviour ported; Revival Blessing's forced-switch choices are enumerated as Showdown
+accepts them; the data exports verify the Showdown checkout they come from and record a
+hash of every handler's source; refsim/PROVENANCE.json records the exports and
+docs/repin.md is the procedure for a pin bump. Its Python distribution is named
+ninjask-areneon (the import name stays ninjask). Upstream contributions are welcome
+but not required.
+
 Pokémon Showdown
 ----------------
-https://github.com/smogon/pokemon-showdown, commit 3a766f2cfb5e51c1e428cfe87d0dba91a8f01640
+https://github.com/smogon/pokemon-showdown, commit 7244fe8e28fa8bc4d0809ae30d183c608b62bb2b
+(refsim/SHOWDOWN_COMMIT; upstream Ninjask was pinned to 3a766f2cfb5e51c1e428cfe87d0dba91a8f01640)
 
 The engine's battle logic is a port of Pokémon Showdown's (the Champions mod
 and the base game it builds on): damage calculation, the action queue, move,

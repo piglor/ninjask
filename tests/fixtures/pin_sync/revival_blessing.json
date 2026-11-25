@@ -1,5 +1,5 @@
 {
- "description": "A synthetic battle (random-legal play, Showdown 7244fe8e) that reaches p2's Revival Blessing forceSwitch request with no living Pok\u00e9mon on the bench: Showdown offers 'pass, pass' beside the two revives; the engine listed only the revives (Ninjask 0.4.1).",
+ "description": "A synthetic battle (random-legal play, Showdown 7244fe8e) that reaches p2's Revival Blessing forceSwitch request with no living Pok\u00e9mon on the bench: Showdown offers 'pass, pass' beside the two revives; the engine listed only the revives (Ninjask 0.4.1). Showdown accepted 'pass, pass', asked p2 again for the same revival (the slot condition lasts to the residual), and p2 then revived with 'pass, switch 3'.",
  "format": "gen9championsvgc2026regmc",
  "seed": "sodium,94637951a5484ad0f15dc9e4714d9d95",
  "teams": {
@@ -121,5 +121,11 @@
   ]
  ],
  "request_owner": "p2",
- "showdown_accepted": "pass, pass"
+ "showdown_accepted": "pass, pass",
+ "then": [
+  [
+   "p2",
+   "pass, switch 3"
+  ]
+ ]
 }

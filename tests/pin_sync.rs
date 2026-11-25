@@ -36,8 +36,9 @@ const IDLE: [&str; 4] = ["Teatime", "BodySlam", "Protect", "Detect"];
 
 fn team(mons: &[String]) -> String {
     let mut all: Vec<String> = mons.to_vec();
-    all.push(mon("Snorlax", "thickfat", &IDLE, "M"));
-    all.push(mon("Clefable", "magicguard", &IDLE, "F"));
+    // Species differ within a team.
+    all.push(mon("Slowbro", "oblivious", &IDLE, "M"));
+    all.push(mon("Pikachu", "static", &IDLE, "M"));
     all.join("]")
 }
 
@@ -159,9 +160,10 @@ fn no_retreat_by_a_ghost_type_starts_silently_and_does_not_trap() {
         assert!(lines
             .iter()
             .any(|l| l.starts_with("|-boost|p1a: Gengar|atk|")));
-        assert!(!lines
-            .iter()
-            .any(|l| l.contains("trapped") || l.contains("No Retreat")));
+        assert!(!lines.iter().any(|l| {
+            (l.starts_with("|-activate|") || l.starts_with("|-start|"))
+                && (l.contains("trapped") || l.contains("No Retreat"))
+        }));
         assert!(b.sides[0].mons[0].vol.no_retreat);
         assert!(request_active(&b, 0, 0).get("trapped").is_none());
     }
@@ -231,4 +233,61 @@ fn revival_blessing_request_offers_pass_when_the_bench_has_no_living_pokemon() {
     assert_eq!(all, legal);
     b.choose(1, fixture["showdown_accepted"].as_str().unwrap())
         .unwrap();
+    // Showdown asks again: the revival lasts to the turn's residual. Then p2 revives.
+    assert_eq!(
+        b.request_json(1).unwrap()["forceSwitch"],
+        serde_json::json!([false, true])
+    );
+    for input in fixture["then"].as_array().unwrap() {
+        b.choose(1, input[1].as_str().unwrap()).unwrap();
+    }
+}
+
+/// The tracker reads Showdown's log: No Retreat's `-activate|..|trapped` is the trap, and the
+/// `noretreat` volatile a Baton Pass hands on is not one (Showdown d12b9c1e9).
+#[test]
+fn the_tracker_sees_no_retreat_trap_only_as_the_trapped_volatile() {
+    use ninjask::tracker::Tracker;
+    let Some(dex) = dex() else { return };
+    let mut t = Tracker::new(dex, 0);
+    let lines = [
+        "|player|p1|Player 1|",
+        "|player|p2|Player 2|",
+        "|gametype|doubles",
+        "|switch|p1a: Persian|Persian, L50, M|100/100",
+        "|switch|p1b: Kleavor|Kleavor, L50, M|100/100",
+        "|switch|p2a: Falinks|Falinks, L50, M|100/100",
+        "|switch|p2b: Scrafty|Scrafty, L50, M|100/100",
+        "|turn|1",
+        "|move|p2a: Falinks|No Retreat|p2a: Falinks",
+        "|-boost|p2a: Falinks|atk|1",
+        "|-activate|p2a: Falinks|trapped",
+        "|-start|p2a: Falinks|move: No Retreat",
+    ];
+    for l in lines {
+        t.feed(l);
+    }
+    let index =
+        |t: &Tracker, name: &str| t.sides[1].mons.iter().position(|m| m.name == name).unwrap();
+    assert!(
+        t.trap_state(1, index(&t, "Falinks")).0,
+        "trapped by the volatile"
+    );
+    for l in [
+        "|upkeep",
+        "|turn|2",
+        "|move|p2a: Falinks|Baton Pass|p2a: Falinks",
+        "|switch|p2a: Snorlax|Snorlax, L50, M|100/100|[from] Baton Pass",
+    ] {
+        t.feed(l);
+    }
+    let newcomer = index(&t, "Snorlax");
+    assert!(
+        t.sides[1].mons[newcomer]
+            .volatiles
+            .iter()
+            .any(|v| v == "noretreat"),
+        "handed on"
+    );
+    assert!(!t.trap_state(1, newcomer).0, "but it traps no more");
 }

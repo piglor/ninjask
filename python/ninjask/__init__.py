@@ -25,6 +25,7 @@ if TYPE_CHECKING:
         DEFAULT_MAX_PATHS,
         IDS_LEN,
         OBS_LEN,
+        SHOWDOWN_COMMIT,
         Batch,
         Battle,
         BattleStateKey,
@@ -40,6 +41,8 @@ else:
     Batch = _compiled.Batch
     # Layouts of Tracker.encode(), encode_ids(), Battle.legal_actions() and
     # Batch.observe() (ninjask::encode).
+    # The Pokémon Showdown commit the engine is a port of (refsim/SHOWDOWN_COMMIT).
+    SHOWDOWN_COMMIT = _compiled.SHOWDOWN_COMMIT
     OBS_LEN = _compiled.OBS_LEN
     IDS_LEN = _compiled.IDS_LEN
     ACTION_FIELDS = _compiled.ACTION_FIELDS
@@ -70,6 +73,7 @@ __all__ = [
     "OBS_LEN",
     "Outcome",
     "Policy",
+    "SHOWDOWN_COMMIT",
     "TEAMS_DIR",
     "TURN_LIMIT",
     "Tracker",

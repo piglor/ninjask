@@ -3,8 +3,8 @@ requires = ["maturin>=1.7,<2"]
 build-backend = "maturin"
 
 [project]
-name = "ninjask"
-version = "0.4.1"
+name = "ninjask-areneon"
+version = "0.4.1+areneon.0"
 description = "A Pokémon Champions VGC doubles simulator that matches Pokémon Showdown exactly, about 200 times faster"
 license = "MIT"
 license-files = ["LICENSE", "NOTICE"]
@@ -34,9 +34,10 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/dcabatin/Ninjask"
-Issues = "https://github.com/dcabatin/Ninjask/issues"
-Changelog = "https://github.com/dcabatin/Ninjask/blob/main/CHANGELOG.md"
+Repository = "https://github.com/piglor/ninjask"
+Issues = "https://github.com/piglor/ninjask/issues"
+Changelog = "https://github.com/piglor/ninjask/blob/main/CHANGELOG.md"
+Upstream = "https://github.com/dcabatin/Ninjask"
 
 [project.optional-dependencies]
 test = ["pytest>=8.0"]

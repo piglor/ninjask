@@ -32,6 +32,19 @@
 //! [`world`] turns a view back into a battle for search under hidden
 //! information, and [`calc`] gives exact damage and turn-order odds.
 
+/// The Pokémon Showdown commit this engine is a port of, and its format exports
+/// are made from: `refsim/SHOWDOWN_COMMIT`, the one place a pin bump edits.
+/// `refsim/PROVENANCE.json` records the exports made from it (docs/repin.md).
+pub const SHOWDOWN_COMMIT: &str = {
+    let (commit, _newline) = include_str!("../refsim/SHOWDOWN_COMMIT")
+        .as_bytes()
+        .split_at(40);
+    match core::str::from_utf8(commit) {
+        Ok(commit) => commit,
+        Err(_) => panic!("refsim/SHOWDOWN_COMMIT is not text"),
+    }
+};
+
 /// Append a line to the battle log, formatting it only when logging is on
 /// (self-play runs with logging off).
 macro_rules! log_line {
