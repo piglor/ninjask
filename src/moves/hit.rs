@@ -109,11 +109,20 @@ impl Battle {
             && self.move_priority(src, mv) > 0
             && mv.target != Target::SelfTarget
             && t.0 != src.0
-            && self.is_grounded(t)
         {
-            let ti = self.ident(t);
-            log_line!(self, "|-activate|{ti}|move: Psychic Terrain");
-            return TryHit::Failed;
+            if self.is_grounded(t) {
+                let ti = self.ident(t);
+                log_line!(self, "|-activate|{ti}|move: Psychic Terrain");
+                return TryHit::Failed;
+            }
+            // An airborne target is not protected, which the terrain says
+            // when the move is a priority move by its own data.
+            if mv.priority > 0 && !self.semi_invulnerable(t) {
+                log_line!(
+                    self,
+                    "|-hint|Psychic Terrain doesn't affect airborne Pokémon."
+                );
+            }
         }
         TryHit::Hit
     }

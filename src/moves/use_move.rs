@@ -1322,7 +1322,20 @@ impl Battle {
                 };
                 let powder = mv.has(MoveFlag::Powder) && t != r && immune_to(self, "powder");
                 let dark = prankster && t.0 != r.0 && immune_to(self, "prankster");
-                if powder || self.run_try_immunity(t, r, mv) || dark {
+                let other = powder || self.run_try_immunity(t, r, mv);
+                if other || dark {
+                    // `hitStepTryImmunity`'s natural Prankster immunity says why, unless the
+                    // target would be immune to the move's own status anyway (an Illusion
+                    // hides that, so it says it then).
+                    if !other
+                        && (self.mon(t).illusion.is_some()
+                            || !mv.status.is_some_and(|s| immune_to(self, s.id())))
+                    {
+                        log_line!(
+                            self,
+                            "|-hint|Since gen 7, Dark is immune to Prankster moves."
+                        );
+                    }
                     let ti = self.ident(t);
                     log_line!(self, "|-immune|{ti}");
                     failed = true;

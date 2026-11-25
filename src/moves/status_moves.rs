@@ -415,6 +415,10 @@ impl Battle {
         let (si, ti) = (self.ident(src), self.ident(t));
         if src.0 == t.0 {
             log_line!(self, "|-activate|{si}|Skill Swap|||[of] {ti}");
+            log_line!(
+                self,
+                "|-hint|Skill Swap does not announce the abilities of the Pokémon when used between allies."
+            );
         } else {
             let (sn, tn) = (
                 self.dex.ability(sa).name.clone(),
