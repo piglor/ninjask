@@ -253,16 +253,20 @@ workstation (load average 4 to 8), not claimed to repeat. Pool: 978 generated
 teams.
 
 **The existing path did not slow down.** `examples/batch_bench` (random policy,
-every decision observed), the evaluated commit and this branch alternating, six
-runs each, decisions per second, medians:
+every decision observed), `origin/main` (the pin sync, `d5db5b8`) and this branch
+alternating, six runs each, decisions per second, medians (measured again after the
+hint additions and the completed lists; the fixture export of the pin for both):
 
-| battles in flight | evaluated commit | this branch | ratio |
+| battles in flight | origin/main | this branch | ratio |
 |---|---|---|---|
-| 64 | 57,999 | 57,969 | 0.999 |
-| 256 | 51,400 | 52,263 | 1.017 |
-| 1024 | 45,604 | 44,409 | 0.974 |
+| 64 | 69,361 | 68,865 | 0.993 |
+| 256 | 62,094 | 60,365 | 0.972 |
+| 1024 | 53,971 | 52,723 | 0.977 |
 
-(Run-to-run spread within one binary is about plus or minus 8%.)
+(Run-to-run spread within one binary is about plus or minus 8%; before the pin sync
+and the hints the same comparison against the evaluated commit gave 0.999, 1.017 and
+0.974. The extended lists sort a list of two for the Pokémon whose ability and item both
+have a `ModifyMove` handler or that have a volatile with an `Update` one, which is rare.)
 
 **Showdown seeds** cost about 3%: `batch_bench` with 256 battles, 54,400 to
 58,600 decisions/s with `sodium,<hex>` seeds against 56,400 to 59,400 with
@@ -295,8 +299,8 @@ value, is the next step for this path.
   from the engine's state to the request text is the next step for throughput.
 - Wait requests, `update`, `noCancel` and every key order were checked against Showdown's
   recorded requests; `rqid` is not emitted (see above).
-- The numbers of "Cost" were measured before the pin sync and the hint additions; the
-  default path was measured again afterwards ("Cost", last table).
+- The channel path's figures of "Cost" were measured before the pin sync and the hint
+  additions; the default path was measured again afterwards ("Cost", first table).
 
 ## Evidence
 
