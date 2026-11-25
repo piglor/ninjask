@@ -46,8 +46,8 @@ number.
 
 The channel is **byte-equal to the Showdown stream** (the one Areneon's runner
 records from `getPlayerStreams`, `|t:|` lines dropped), on all 3,200 recorded
-battles of the evaluation corpus but the nine that hold No Retreat (a
-behaviour Showdown changed after the engine's pin; ticket #1531):
+battles of the evaluation corpus (the nine that hold No Retreat differed until the
+pin sync, #1531) and on the hand-built scenarios of the hint audit below:
 
 - the **banner**, which the engine's own log does not carry: `|gen|`, the
   `|rule|` lines, the Open Team Sheets prompt (`|uhtml|`) and its clearing
@@ -67,14 +67,20 @@ behaviour Showdown changed after the engine's pin; ticket #1531):
   for, followed by the side's request again with `"update":true` (the next
   `request_seq`).
 - the **hints** (`|-hint|...`) that Showdown prints where the engine's log had
-  none: Skill Swap between allies, Future Sight that does not hit, Dark's
-  immunity to Prankster, Rising Voltage on a grounded target, Psychic Terrain
-  not protecting an airborne target. They change the engine's own log (they
-  are in `omniscient` too), which moves `examples/fingerprint` (see
+  none: ten of the fifteen places a battle of this format can reach, listed in the audit below. They change the engine's own log
+  (they are in `omniscient` too), which moves `examples/fingerprint` (see
   CHANGELOG).
 
 A channel holds no copy of the log: its segments name ranges of it and lines
-are made when asked for, so a battle nobody reads costs only its requests.
+are made when asked for, but it keeps every request (as a JSON value, for the
+candidates and the hash), which is most of its memory, so channels are not free
+for a battle nobody reads. Measured (`scripts/areneon/memory_per_battle.py`,
+1,024 battles, 73 decisions each, resident memory per battle): channels off 64
+KiB; channels on and never read 218 KiB (about 154 KiB more); read and
+discarded after each step (`discard_channel`, the omniscient channel too) 159 KiB,
+which gives back about 38% of the extra. A harness that reads every step should
+discard what it has read, and one that needs no channel for a battle should not
+ask for them.
 `Batch.observe()` is separate: a batch builds the trackers it needs only when
 `observe` is first called, so a batch read through channels builds none.
 
@@ -90,6 +96,48 @@ battle ended, bit 2 refused as invalid. `choose_candidates` takes the index of
 a candidate instead. `Batch.step` (indices into the engine's own lists) keeps
 its meaning and also feeds the channels. `Batch.pending()` lists the decisions
 (battle, side) without building observations.
+
+### Hint audit
+
+Showdown's `|-hint|` lines are in the players' channels (and the omniscient log), so a
+missing one changes any digest of a channel. The audit covers **every** place the pinned
+Showdown (`7244fe8e`) writes one: `battle.hint(...)` and `add('-hint', ...)` in `sim/` and
+`data/` (the mods other than `champions` are not played here); there are 32. Each is classed
+by whether a battle of `gen9championsvgc2026regmc` can reach it, and each reachable one has a hand-built
+scenario recorded from Showdown (`tests/fixtures/areneon/scenarios.jsonl.gz`,
+`tests/python/test_n1_scenarios.py`) and, where its absence is the interesting part,
+a control that prints none.
+
+| Site (pin) | Trigger | Reachable in Reg M-C | Engine |
+|---|---|---|---|
+| `battle-actions.ts` 680 | a Prankster move at a Dark foe | yes | prints (scenarios `prankster-dark-*`) |
+| `battle-actions.ts` 318 | a `cantusetwice` move (Gigaton Hammer) used again right after itself (Instruct) | yes | **added** (`gigatonhammer-instruct`, `-once`) |
+| `moves.ts` 5098, 5484 | Fake Out, First Impression after the first turn out (Copycat, Instruct) | yes | **added** (`fakeout-copycat`, `fakeout-instruct`, `firstimpression-instruct`, controls `fakeout-first-turn`, `fakeout-after-switch-in`) |
+| `moves.ts` 20925 | Wish used on turn 256 (8-bit turn count) | yes | **added** (`turn-overflow-wish-futuresight`, control `wish-late`) |
+| `conditions.ts` 386 | Future Sight used from turn 253 | yes | **added** (same scenario) |
+| `conditions.ts` 399 | Future Sight lands on a slot whose Pokémon fainted | yes | prints (`futuresight-target-fainted`) |
+| `battle.ts` 1332 | Skill Swap between allies | yes | prints (`skillswap-ally`, `-foe`) |
+| `moves.ts` 15138 | Rising Voltage with Electric Terrain at a grounded foe | yes | prints (`risingvoltage-*`) |
+| `moves.ts` 14118 | a priority move at an airborne target under Psychic Terrain | yes | prints (`psychicterrain-*`) |
+| `moves.ts` 16238, 16241 | Shell Side Arm hits a foe / its Substitute | yes | prints (`shellsidearm-*`) |
+| `moves.ts` 20989 | Body Press under Wonder Room | yes | prints (`wonderroom-bodypress`) |
+| `abilities.ts` 2609 | a Mimicry holder (here a Ditto that transformed into one) changes type when the terrain ends | yes | prints (`mimicry-transformed-terrain-ends`) |
+| `moves.ts` 798 | Aura Wheel used by a non-Morpeko (Copycat) | yes | prints (`aurawheel-copycat`) |
+| `moves.ts` 3370 Dark Void, 9174 Hyperspace Fury, 9690 Ion Deluge, 10997 Mat Block | the moves | no: not in the format's move list | not applicable |
+| `moves.ts` 3504 Destiny Bond, 15442 Roost, `battle-actions.ts` 1925 | Dynamax, Terastallization, Ogerpon's Tera | no: neither exists in the format | not applicable |
+| `moves.ts` 17999 Stockpile; `battle.ts` 2060, 2240, 2243; `battle-actions.ts` 143 | Gen 7, Gen 2, Gen 1, Gen 3-4 rules | no: Gen 9 | not applicable |
+| `battle.ts` 2774, 2780 | a switch cancelled by a Pursuit faint (`pursuitfaint`) | no: Pursuit is not a move of the format | not applicable |
+| `abilities.ts` 2085 Illusion Level Mod; `rulesets.ts` 1396 Sleep Clause Mod | rules the format does not have | no | not applicable |
+| `battle-actions.ts` 64 | `switchIn` of a Pokémon that is already in | not shown reachable: a validated choice never names an active Pokémon and a switch action precedes every move; no recorded battle or scenario reaches it | not printed (unverified) |
+
+Of the fifteen reachable sites the engine already printed five (Aura Wheel, Mimicry, Shell
+Side Arm in both places, Wonder Room); the first scan of the 3,200 recorded battles found
+five more it omitted (Skill Swap, Future Sight that does not hit, Prankster, Rising Voltage,
+Psychic Terrain); the audit found five that none of those battles holds (Fake Out and First
+Impression after Copycat or Instruct, the `cantusetwice` hint, and the two turn-overflow
+hints). The claim is therefore: these are **all** the `|-hint|` lines of the pin that a
+battle of this format can produce, except the last row, which is argued, not shown. Mat
+Block, Dark Void and the others would need a format that has the move.
 
 ## 3. Candidates
 
@@ -129,8 +177,9 @@ items and the range, then the permutation; `randomChance`: `true`/`false`).
 
 - `record_draws=True` (on `Battle`, `Batch`) logs every call with the result
   used; `take_draws()` returns and empties the log. The engine's draws equal
-  Showdown's, call for call, for the same seed and choices on 3,198 of the
-  3,200 corpus battles (the two others: see "Known gaps").
+  Showdown's, call for call, for the same seed and choices on all 3,200 corpus
+  battles (two differed in the framing of a shuffle until the sorted lists below
+  were completed).
 - `set_forced_draws(draws)` is the forced mode of the harness: the n-th call
   made from now on is answered from the n-th entry when its method and
   arguments equal the entry's, otherwise by the engine's own generator; the
@@ -145,11 +194,57 @@ items and the range, then the permutation; `randomChance`: `true`/`false`).
   cannot have is a `ValueError`.
 - Switched off, the log costs one check per draw.
 
-To make the labels equal Showdown's, six call sites that drew `random(n)`
+To make the labels equal Showdown's, five call sites that drew `random(n)`
 directly now call the method Showdown calls (`sample` for a random target,
 the Roar and Dragon Tail switch-in and Trace's pick; `randomChance` for
 accuracy, with a fractional numerator where the stages leave one): the numbers
 drawn are unchanged.
+
+**Sorted lists and the framing of a shuffle.** Showdown sorts the handlers of an
+event and shuffles each run of equal ones: `shuffle(len, start, end)`, where `len`
+is the whole list. The engine builds each such list by hand, so a handler it
+leaves out because it never acts leaves the numbers drawn unchanged and changes
+`len`. A forced replay (`set_forced_draws`) then does not match that call and uses
+the engine's own draw, which is wrong there; the natural game (Showdown seed or
+fast generator) is not affected. The 3,200-battle run found two such lists:
+`ModifyMove` (a Pokémon with Keen Eye under Gravity and Wonder Room: Showdown
+`shuffle(3, 1, 3)`, the engine `shuffle(2, 0, 2)`) and `Update` (Attract and Fling
+next to a held Aspear Berry: Showdown `shuffle(3, 0, 2)`, the engine
+`shuffle(2, 0, 2)`). Both lists now include the user's ability and item handlers
+(and the freeze status for `ModifyMove`) read from the dex's handler tables, as the
+other sorted lists already do for their events; they tie with nothing (another
+subOrder), so the numbers drawn are unchanged: the same 3,200 battles equal
+Showdown's draws call for call, the two recorded battles are regression tests
+(`tests/fixtures/areneon/gaps.jsonl.gz`, which failed before) and so is a scenario
+(`keeneye-gravity-wonderroom`). `tests/python/test_n1_handlers.py` holds the sets of
+abilities and items with such a handler in this format: a pin that adds one fails it.
+
+How much of this is checked is measured, not claimed (`scripts/areneon/sort_sites.py`,
+which replays the corpus with the engine's own sort trace): of the 43 call sites of the
+sorting helpers in `src/`, 16 drew between ties in the 3,200 battles and their framing equals
+Showdown's there (7 more sorts are reached through the helpers and attributed to a wrapper's
+line, and drew too). At the other 27 no shuffle was attributed in the corpus: 11 sorted
+lists of two or more with no tie, 16 were not reached at all. Their framing is
+**unaudited**: it is only as complete as the list each one builds. They include the
+`BeforeMove` lists of `use_move.rs` (Throat Chop and Heal Block at priority 6, the foes'
+Imprisons at 4, Chilly Reception), the `Accuracy`, `ModifySecondaries`, `SetStatus`,
+`AfterMove` and `AfterMoveSecondary` lists, the trap lists and the berries'. The consequence
+of a gap there is the one above: a forced replay that does not match one shuffle and then
+uses the engine's own draw; a natural game is unaffected.
+
+## Evaluation only
+
+Some of this API reads what a player must never see, and is for the harness's
+evaluation and tooling, not for anything that feeds a policy: the `omniscient` channel
+(both sides' exact values and secrets), `Battle.chosen(side)` (a side's pending choice,
+the other side's included), `take_draws` / `set_forced_draws` (the random outcomes of a
+battle), `show_team_sheets` (writes the opponent's sets into the log) and, for
+the same reason, a recording's omniscient log and draw trace. A policy's input is its
+own player channel and the candidates built from its own request.
+`tests/python/test_n1_channels.py` has a canary for this boundary: it scans the player
+channels of fresh and recorded battles for the other player's request or error, the
+other side's exact hit points and an unresolved split marker, and it flags the
+omniscient log fed to the same check.
 
 ## Cost
 
@@ -182,15 +277,40 @@ roughly 80 us a decision): building each side's request as a JSON value
 A request written straight to text from the engine's state, without the JSON
 value, is the next step for this path.
 
-## Known gaps (found by the corpus runs, not fixed here)
+## Known gaps
 
-- No Retreat (9 of 3,200 battles): Showdown's `|-activate|...|trapped` against
-  the engine's `|-start|...|move: No Retreat`; the pin sync (#1531).
-- The engine's handler lists for a sorted event omit a handler that never acts
-  (2 of 3,200 battles: Keen Eye next to Gravity and Wonder Room; Aspear Berry
-  next to Attract and Fling). The numbers drawn are equal; the call is
-  `shuffle(2,0,2)` where Showdown's is `shuffle(3,1,3)`, so a forced trace
-  does not match there and the natural draw is used. The differential harness
-  reports it as a difference at that step.
-- Wait requests, `update`, `noCancel` and every key order were checked
-  against Showdown's recorded requests; `rqid` is not emitted (see above).
+- **No `|tie` at the turn limit.** `Batch.turn_limit` (150 by default) only stops
+  offering decisions (`pending()` is empty, `done(i)` is true) once a battle's turn
+  counter reaches it: the battle is not ended, no `|tie` or blank line is written to any
+  channel and `winner` is unset. Areneon's runner cuts a game at `max_turns` by writing
+  `>forcetie` after the `|turn|` line that passes the limit, so its logs end with `|tie`
+  and `turns == max_turns + 1`. A harness that must reproduce that cut sets
+  `turn_limit = max_turns + 1` and writes the tie itself (the engine has no forced tie):
+  N2 has to decide whether the engine writes it.
+- **Framing of a shuffle at the 27 unexercised sorted-list call sites** (see section 4):
+  unaudited, not known wrong.
+- **`switchIn` of an active Pokémon** is the one hint site not shown unreachable (above).
+- **No direct request-text writer.** A request is built as a JSON value and then
+  written; about 60% of the channel path's time is that value (see "Cost"). A writer
+  from the engine's state to the request text is the next step for throughput.
+- Wait requests, `update`, `noCancel` and every key order were checked against Showdown's
+  recorded requests; `rqid` is not emitted (see above).
+- The numbers of "Cost" were measured before the pin sync and the hint additions; the
+  default path was measured again afterwards ("Cost", last table).
+
+## Evidence
+
+Run on the final code, on top of the pin sync (`d5db5b8`), with the scripts of
+`scripts/areneon/README.md` (the numbers are of the run reported on PR #1):
+
+| Check | Result |
+|---|---|
+| 3,200 recorded battles (random-legal, pending-first, uniform-all, Illusion teams) replayed into the engine: request hashes | 3,200 of 3,200 equal |
+| candidates at every request against the recorded reference lists (order and `pending` included) | 3,200 of 3,200 equal (about 120,000 requests) |
+| both channels and the omniscient log, line for line | 3,200 of 3,200 equal (3,191 before the pin sync and the hints) |
+| the engine's draws against Showdown's, call for call | 3,200 of 3,200 equal (3,198 before the sorted lists) |
+| forced replay on the fast generator (game and channels equal Showdown's) | 3,200 of 3,200 equal (3,189 before) |
+| 146,352 fresh requests (3,600 battles, random candidates incl. pending) against Areneon's `enumerateCandidates` (TypeScript, same request text) | 146,352 equal, 0 differ, 0 refused by the reference's schema; 13,243,850 candidates, 59,673 pending |
+| fresh battles judged by the engine (brute force over every syntactic choice string) | 104,318 requests of 3,600 battles: no non-pending candidate refused by the engine; 11,062 pending candidates refused, all as `[Unavailable choice]` and each followed by a changed request; 2,607 requests brute-forced over every syntactic choice string of their phase, no accepted action missing |
+| `examples/fingerprint` (2,000 fixture games), against `origin/main` | logs: +116 hint lines; requests: equal; the numbers drawn: equal (258,916 draws, one hash before and after); the draws entry of the fingerprint moves only by 64 `# sort` trace entries; `c826ee9bb327b2d8` to `36adc509dbe129d1` |
+| 25 hand-built hint scenarios and the two gap battles, channels and draws | 27 of 27 equal (5 differed in channels and 1 in draws, and both gap battles in draws, before the fixes) |

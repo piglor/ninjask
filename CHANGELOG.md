@@ -5,8 +5,9 @@
 Fork changes for a training harness (Areneon, ticket #1532): Showdown seeds in
 `Batch`, per-player channels, candidates and the draw log. See
 `docs/n1-seeds-channels-candidates.md`. Games play as before (the same draws
-in the same order for every seed); logs gain five `|-hint|` lines Showdown
-prints, so `examples/fingerprint` moves.
+in the same order for every seed); logs gain ten `|-hint|` lines Showdown
+prints, so `examples/fingerprint` moves from `c826ee9bb327b2d8` to
+`36adc509dbe129d1`.
 
 ### Added
 
@@ -18,28 +19,61 @@ prints, so `examples/fingerprint` moves.
   with wait requests and without `rqid`, `|error|` lines and the request
   again after a refusal that revealed something, the blank line before
   `|win|` / `|tie`. `Batch(..., channels=True)`, `Battle(..., channels=True)`,
-  `channel(viewer, start)`, `channel_len`, `request_hash` (`ninjask::identity`:
-  SHA-256 of the canonical JSON of the request without `rqid`).
+  `channel(viewer, start)`, `channel_len`, `discard_channel`, `request_hash`
+  (`ninjask::identity`: SHA-256 of the canonical JSON of the request without `rqid`).
 - **Candidates** (`ninjask::candidates`): `Battle.candidates(side)` /
   `Batch.candidates(i, side)`, a port of Areneon's reference enumerator
-  (360 ordered Team Preview picks, its order, `pending` flags);
-  `Batch.choose` (text), `Batch.choose_candidates` (indices),
-  `Batch.pending()`; `Battle.chosen(side)`.
+  (360 ordered Team Preview picks, its order, `pending` flags), tied to its
+  source by `tests/fixtures/areneon/SOURCE.json`; `Batch.choose` (text),
+  `Batch.choose_candidates` (indices), `Batch.pending()`; `Battle.chosen(side)`.
 - **Draw log and forced draws** (`ninjask::rng`): `record_draws=True`,
   `take_draws()`, `set_forced_draws()`, `reset(..., forced_draws=...)`: every
   call of Showdown's PRNG (`random`, `randomChance`, `sample`, `shuffle`) with
   its arguments and result, and a mode that answers calls from a list.
 - `Batch` builds the trackers `observe` reads when it is first called, so a
   batch read through channels builds none.
+- `scripts/areneon/`: the recorder of Showdown battles, the comparisons with
+  Areneon's reference enumerator, the hand-built hint scenarios and the audits that
+  the evidence is made with (`scripts/areneon/README.md`); fixtures under
+  `tests/fixtures/areneon/`.
 
 ### Changed
 
 - Five sites that drew `random(n)` directly call the method Showdown calls
   (`sample`, `randomChance`): the numbers drawn are unchanged.
-- The engine's log carries five `|-hint|` lines it omitted (Skill Swap
-  between allies, Future Sight that does not hit, Dark's immunity to
-  Prankster, Rising Voltage on a grounded target, Psychic Terrain not
-  protecting an airborne target). The fingerprint's log hash changes.
+- The engine's log carries ten `|-hint|` lines it omitted, the places of an audit
+  of every hint call site of the pin (`docs/n1-seeds-channels-candidates.md`,
+  "Hint audit"): Skill Swap between allies, Future Sight that does not hit, Dark's
+  immunity to Prankster, Rising Voltage on a grounded target, Psychic Terrain not
+  protecting an airborne target, Fake Out and First Impression after the first turn
+  out (Copycat, Instruct), a `cantusetwice` move used again (Gigaton Hammer),
+  Future Sight from turn 253 and Wish on turn 256. The fingerprint's log hash changes.
+  The fingerprint's three parts on the 2,000 fixture games: the logs differ by 116 hint lines
+  (`9489572e7e8eb387` to `a601ff69e464a335`), the requests are equal (`905e08f88638ebee`), and the
+  draws entry moves because the extended lists below add 64 `# sort` trace entries; the numbers
+  drawn are equal (the same 258,916 draws, one hash `a9f7e8785643537e` before and after, checked
+  with a copy of the example that skips the sort entries).
+- The sorted `ModifyMove` and `Update` handler lists include the handlers Showdown
+  collects and the engine ran elsewhere (the user's ability and item, its freeze), as
+  the engine's other sorted lists do; the numbers drawn are unchanged, the framing of
+  the shuffle (`shuffle(len, start, end)`) now equals Showdown's.
+- The format exports carry `format.banner` (the lines Showdown writes around the start of a
+  battle, from `refsim/export_banner.js`); `refsim/export_banner.js` is a tool file of
+  `scripts/repin.py` now and `refsim/PROVENANCE.json` was rewritten: only the `format` section of
+  each bundled format (its hash and its key count), the export's own hash and size and the hashes of
+  the tool files differ.
+- `Battle.reseed` replaces only the generator: the draw log and forced draws stay
+  (it used to drop them). Evaluation-only interfaces (`chosen`, `take_draws`,
+  `show_team_sheets`, the omniscient channel) are labelled as such.
+- **For embedders** that build a `PyBattle` themselves (the crate's `python` feature): it
+  has a private channel field now; construct it with `PyBattle::from(battle)`
+  instead of a struct literal.
+
+### Known gaps
+
+No `|tie` is written at `Batch.turn_limit`; the framing of a shuffle at 27 sorted-list
+call sites no corpus battle reaches is unaudited; `docs/n1-seeds-channels-candidates.md`,
+"Known gaps".
 
 ## 0.4.1+areneon.0 (2026-11-25)
 
