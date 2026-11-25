@@ -101,6 +101,12 @@ pub struct Battle {
     /// berry eaten, Fickle Beam's roll) are evaluated without doing so.
     /// Always false in play.
     pub(crate) probe: bool,
+    /// With `probe` on, run the event sorts too, so their tie draws happen (and are counted in `calc_draws`) as they do in
+    /// play. Only the declared-state layer (`crate::declared`) turns it on; it never matters to the numbers a calculation returns.
+    pub(crate) probe_sorts: bool,
+    /// How many random draws the sorts inside read-only calculations made since the layer last cleared it. A calculation
+    /// restores the generator, so the draws would otherwise be invisible.
+    pub(crate) calc_draws: u32,
     /// When set, every damaging hit's predicted distribution and actual
     /// damage are recorded (`crate::calc::DamageSample`), to test the
     /// calculation against played outcomes. Off in play.
@@ -375,6 +381,8 @@ impl Battle {
             turn_state: Default::default(),
             relocated: None,
             probe: false,
+            probe_sorts: false,
+            calc_draws: 0,
             damage_samples: None,
         };
         b.add(format!(
@@ -460,6 +468,8 @@ impl Battle {
             turn_state: Default::default(),
             relocated: None,
             probe: false,
+            probe_sorts: false,
+            calc_draws: 0,
             damage_samples: None,
         }
     }
@@ -506,6 +516,22 @@ impl Battle {
             let line = format!("|showteam|{}|{}", self.sides[s].id(), self.sides[s].sheet);
             self.add(line);
         }
+    }
+
+    /// Showdown's `start()` of a format without Team Preview: the `start` action alone, with both
+    /// teams as they stand (the declared-state layer's scenario battles, `crate::declared`).
+    pub(crate) fn start_without_preview(&mut self) {
+        self.queue.clear();
+        self.queue.push_back(Action {
+            kind: ActionKind::Start,
+            order: 2,
+            priority: 0,
+            speed: 1,
+            frac: 0,
+        });
+        self.mid_turn = false;
+        self.request = RequestState::Move;
+        self.run();
     }
 
     /// Fast path for self-play: submit an already-legal structured choice.
@@ -1080,7 +1106,7 @@ impl Battle {
     }
 
     /// Showdown `runMegaEvo` + Champions `formeChange` (permanent).
-    fn run_mega_evo(&mut self, r: MonRef) {
+    pub(crate) fn run_mega_evo(&mut self, r: MonRef) {
         if self.sides[r.0].mega_used {
             return;
         }

@@ -728,8 +728,8 @@ impl Battle {
         source: Option<MonRef>,
         extra: &[ModHandler],
     ) {
-        // Only the sort's draws matter, and a read-only calculation makes none.
-        if self.probe {
+        // Only the sort's draws matter, and a read-only calculation makes none (unless the declared-state layer asks to see them).
+        if self.probe && !self.probe_sorts {
             return;
         }
         // findEventHandlers collects a Pokémon's, its allies' and its foes'

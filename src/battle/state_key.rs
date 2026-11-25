@@ -125,6 +125,9 @@ impl From<&Battle> for BattleStateKey {
             log_enabled: _,
             last_move_line: _,
             damage_samples: _,
+            // The declared-state layer's calculation switches (never on in play).
+            probe_sorts: _,
+            calc_draws: _,
         } = b;
         Self {
             dex: DexIdentity(dex.clone()),

@@ -44,6 +44,16 @@ pub struct HitRolls {
     pub crit: [u32; 16],
 }
 
+/// The critical-hit rule of a hit as `getDamage` applies it: none (the target prevents it, or the stage is 0), always
+/// (a move that always crits and draws nothing), or `randomChance(numerator, denominator)`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum CritRule {
+    #[default]
+    Never,
+    Always,
+    Chance(u32, u32),
+}
+
 /// A damaging hit recorded in play with its predicted distribution
 /// (`Battle::damage_samples`), to test the calculation.
 #[derive(Clone, Debug)]
@@ -86,6 +96,8 @@ pub struct DamageCalc {
     pub accuracy: f64,
     /// The chance of a critical hit, per hit.
     pub crit_chance: f64,
+    /// The same as the engine's own rule (the pair its `randomChance` is given), for a caller that needs the form.
+    pub crit_rule: CritRule,
     /// The spread reduction applies (two targets or more).
     pub spread: bool,
     /// The chance of each number of hits: `hit_counts[i]` for `i + 1` hits.
@@ -160,6 +172,8 @@ const QUICK_CLAW: (u32, u32) = (1, 5);
 /// touches, and a Stance Change user's forme.
 struct CalcSave {
     rng: crate::rng::Rng,
+    /// The draws the generator's trace had recorded (the trace is on only for the declared-state layer).
+    draws: usize,
     flags: (Option<MonRef>, u8, bool, bool, bool, Option<MonRef>),
     user: Option<crate::state::Mon>,
 }
@@ -190,6 +204,7 @@ impl Battle {
     /// Enter probe mode and save what a calculation touches.
     fn calc_begin(&mut self, r: MonRef) -> CalcSave {
         let save = CalcSave {
+            draws: self.rng_draws(),
             rng: self.rng.clone(),
             flags: (
                 self.ability_breaker,
@@ -221,7 +236,16 @@ impl Battle {
             self.active_move.pbond,
             self.active_move.ignore_evasion,
         ) = save.flags;
+        self.calc_draws += (self.rng_draws() - save.draws) as u32;
         self.rng = save.rng;
+    }
+
+    /// How many draws (not sorts) the generator's trace holds; 0 with the trace off.
+    pub(crate) fn rng_draws(&self) -> usize {
+        self.rng
+            .trace
+            .as_ref()
+            .map_or(0, |t| t.iter().filter(|l| !l.starts_with('#')).count())
     }
 
     /// The calculation for `attacker`'s move `move_id` against `target`.
@@ -363,6 +387,7 @@ impl Battle {
                     let (pc, rolls) =
                         self.hit_rolls(r, t, &mv, kind, move_type, type_changed, out.spread);
                     out.crit_chance = pc;
+                    out.crit_rule = self.crit_rule(r, t, &mv);
                     out.hits.push(rolls);
                 } else {
                     let first = out.hits[0];
@@ -390,6 +415,7 @@ impl Battle {
         spread: bool,
     ) -> (f64, HitRolls) {
         let saved_rng = self.rng.clone();
+        let draws_before = self.rng_draws();
         let saved = (self.probe, self.log_enabled, self.mon(t).ability_state);
         self.probe = true;
         self.log_enabled = false;
@@ -422,6 +448,7 @@ impl Battle {
         }
         (self.probe, self.log_enabled) = (saved.0, saved.1);
         self.sides[t.0].mons[t.1].ability_state = saved.2;
+        self.calc_draws += (self.rng_draws() - draws_before) as u32;
         self.rng = saved_rng;
         (crit_chance, rolls)
     }
@@ -443,15 +470,28 @@ impl Battle {
 
     /// The chance of a critical hit (`getDamage`'s crit roll).
     pub fn crit_chance(&self, r: MonRef, t: MonRef, mv: &Move) -> f64 {
+        match self.crit_rule(r, t, mv) {
+            CritRule::Never => 0.0,
+            CritRule::Always => 1.0,
+            CritRule::Chance(n, d) => n as f64 / d as f64,
+        }
+    }
+
+    /// `getDamage`'s crit rule as the engine states it: a prevented crit is none, `willCrit` is always (no draw),
+    /// stage 0 is none (no draw), else `randomChance(1, d)` of the stage's odds (stage 4 is `1/1`).
+    pub fn crit_rule(&self, r: MonRef, t: MonRef, mv: &Move) -> CritRule {
         if self.crit_prevented(r, t, mv) {
-            return 0.0;
+            return CritRule::Never;
         }
         if mv.will_crit {
-            return 1.0;
+            return CritRule::Always;
         }
         let ratio = self.run_modify_crit_ratio(r, t, mv.crit_ratio).clamp(0, 4);
+        if ratio == 0 {
+            return CritRule::Never;
+        }
         let (n, d) = CRIT_ODDS[ratio as usize];
-        n as f64 / d as f64
+        CritRule::Chance(n, d)
     }
 
     /// Whether `t` is immune to `r`'s move, by the steps `use_move` takes

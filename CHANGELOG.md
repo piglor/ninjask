@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- **The declared-state layer (`ninjask::declared`, `ninjask-probe`, `ninjask.Prober`).** Answers Areneon's mechanics-probe
+  queries (`damage`, `speed_order`, `stats`) over declared sets and an absolute declared state from the engine's calculators, byte-equal
+  with the Showdown probe where it answers and an abstention naming the entity where it does not (docs/declared.md). Engine changes:
+  `Battle::start_without_preview` and a public `run_mega_evo` (crate), `calc::CritRule` (the crit rule as the engine's own
+  `randomChance` pair, stage 4 `1/1`), and `probe_sorts`/`calc_draws` so a read-only calculation can report the tie draws its event
+  sorts would make (off in play).
+
 Hardening after the review of the pin sync.
 
 ### Changed
