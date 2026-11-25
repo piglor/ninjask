@@ -148,8 +148,11 @@ def joint_choices(
     force = request.get("forceSwitch")
     rule = _forced_rule(request) if force is not None else None
     out = []
+    reviving = rule[1] if rule is not None else []
     for combo in itertools.product(*per_slot):
-        switches = [a.index for a in combo if a.kind == "switch"]
+        # A revival is never recorded as a switch-in (Showdown's `switchIns`): two reviving slots may
+        # name the same fainted teammate.
+        switches = [a.index for slot, a in enumerate(combo) if a.kind == "switch" and not (slot < len(reviving) and reviving[slot])]
         if len(switches) != len(set(switches)):
             continue
         if sum(a.mega for a in combo) > 1:
