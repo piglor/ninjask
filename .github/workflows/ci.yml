@@ -149,8 +149,8 @@ jobs:
       - name: Export the Reg M-C format
         run: .venv/bin/python -c "import ninjask; ninjask.load('gen9championsvgc2026regmc')"
 
-      - name: Reference mode, synthetic teams (1000 games)
-        run: .venv/bin/python scripts/check_reference.py --synthetic --games 1000 --workers 4
+      - name: Reference mode, synthetic teams (2000 games)
+        run: .venv/bin/python scripts/check_reference.py --synthetic --games 2000 --workers 4
 
       - name: Reference mode, real teams (400 games)
         run: .venv/bin/python scripts/check_reference.py --pool pools/vgcpastes-regmc.txt --games 400 --workers 4
@@ -160,16 +160,20 @@ jobs:
           .venv/bin/python scripts/check_reference.py --synthetic --require noretreat --games 500 --workers 4
           .venv/bin/python scripts/check_reference.py --synthetic --require revivalblessing --games 500 --workers 4
 
-      - name: Chaos teams (500 games in each of three mixes, two seeds)
+      - name: Chaos teams (1000 games in each of three mixes, two seeds)
         run: |
           for seed in 1 2; do
             for mix in chaos wide mixed; do
-              .venv/bin/python scripts/check_chaos.py --games 500 --seed "$seed" --mix "$mix" --workers 4
+              .venv/bin/python scripts/check_chaos.py --games 1000 --seed "$seed" --mix "$mix" --workers 4
             done
           done
 
-      - name: Refused, repeated and replaced choices (100 games)
-        run: .venv/bin/python scripts/check_choices.py --games 100 --workers 4
+      - name: Pairs of trapping, switching and Revival Blessing mechanics (1836 games)
+        # Only ids the engine supports: an unsupported one kills the pool's worker and the run hangs (docs/repin.md).
+        run: .venv/bin/python scripts/check_pairs.py --ids noretreat,revivalblessing,meanlook,block,spiritshackle,jawlock,octolock,batonpass,shedtail,ingrain,firespin,whirlpool,uturn,partingshot,imprison,trick,suckerpunch,pollenpuff --games-per-pair 12 --seed 7 --workers 4
 
-      - name: Protocol tracker (50 games)
-        run: .venv/bin/python scripts/check_tracker.py --games 50
+      - name: Refused, repeated and replaced choices (300 games)
+        run: .venv/bin/python scripts/check_choices.py --games 300 --workers 4
+
+      - name: Protocol tracker (100 games)
+        run: .venv/bin/python scripts/check_tracker.py --games 100
