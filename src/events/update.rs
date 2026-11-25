@@ -12,7 +12,8 @@ impl Battle {
     /// The volatiles' `Update` handlers (subOrder 2): Attract,
     /// Fling and Syrup Bomb. They run in insertion order, and equal ones draw.
     pub(crate) fn volatile_update(&mut self, r: MonRef) {
-        use crate::abilities::{compare_mod, ModHandler};
+        use crate::abilities::{compare_mod, ModHandler, SUB_ORDER_ABILITY, SUB_ORDER_ITEM};
+        use crate::dex::events::{Event, Role};
         let m = self.mon(r);
         let v = &m.vol;
         let mut hs: ArrayVec<(u32, ResidualVol), 3> = ArrayVec::new();
@@ -29,22 +30,38 @@ impl Battle {
             ));
         }
         if hs.is_empty() {
+            // Showdown's list also holds the ability's and the item's
+            // handlers, which tie with nothing here (subOrders 7 and 8): with
+            // no volatile in it nothing sorts into a draw.
             return;
         }
         let speed = m.speed;
         hs.sort_by_key(|h| h.0);
-        let mut keyed: ArrayVec<(ModHandler, ResidualVol), 3> = hs
+        // The ability's and the item's `onUpdate` are in the list Showdown
+        // sorts with the volatiles' (the engine runs them in `ability_update`
+        // and `item_update`): they tie with nothing, but they are in the
+        // `len` of the shuffle that breaks a tie between the volatiles.
+        let mut keyed: ArrayVec<(ModHandler, Option<ResidualVol>), 5> = hs
             .into_iter()
-            .map(|(_, k)| (ModHandler::new(0, speed, 2), k))
+            .map(|(_, k)| (ModHandler::new(0, speed, 2), Some(k)))
             .collect();
+        if let Some(p) = self.dex.ability_handlers[m.ability as usize].priority(Event::Update, Role::Own) {
+            keyed.push((ModHandler::new(p, speed, SUB_ORDER_ABILITY), None));
+        }
+        if let Some(item) = m.item.filter(|_| !m.revived) {
+            if let Some(p) = self.dex.item_handlers[item as usize].priority(Event::Update, Role::Own) {
+                keyed.push((ModHandler::new(p, speed, SUB_ORDER_ITEM), None));
+            }
+        }
         if keyed.len() > 1 {
             self.speed_sort_by(&mut keyed, |a, b| compare_mod(&a.0, &b.0));
         }
         for &(_, k) in keyed.iter() {
             match k {
-                ResidualVol::Attract => self.volatiles_on_update(r),
-                ResidualVol::Fling => self.fling_on_update(r),
-                _ => self.syrup_bomb_on_update(r),
+                Some(ResidualVol::Attract) => self.volatiles_on_update(r),
+                Some(ResidualVol::Fling) => self.fling_on_update(r),
+                Some(_) => self.syrup_bomb_on_update(r),
+                None => {}
             }
         }
     }

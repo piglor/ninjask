@@ -977,6 +977,13 @@ impl Battle {
                     ending_turn,
                     source: r,
                 });
+                // The turn count is an 8-bit one since Gen 8: a hit due on
+                // turn 255 or later never comes (`futuremove`'s onStart).
+                if ending_turn >= 254 {
+                    self.add(
+                        "|-hint|In Gen 8+, Future attacks will never resolve when used on the 255th turn or later.",
+                    );
+                }
                 log_line!(self, "|-start|{ri}|move: Future Sight");
                 // NOT_FAIL: the move counts as done.
                 Some(Some(true))

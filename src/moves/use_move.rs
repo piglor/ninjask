@@ -6,7 +6,7 @@ use super::hit::TryHit;
 use crate::battle::log::LogEntry;
 use crate::battle::Small;
 use crate::battle::{ActiveList, Battle, MonRef};
-use crate::dex::events::Event;
+use crate::dex::events::{Event, Role};
 use crate::dex::types::*;
 use crate::dex::Move;
 use crate::kinds::AbilityKind;
@@ -215,6 +215,11 @@ impl Battle {
         if self.dex.move_kind[move_id as usize] != MoveKind::DestinyBond {
             self.mon_mut(r).vol.destiny_bond = false;
         }
+        // A `cantusetwice` move (Gigaton Hammer, Blood Moon) used right after
+        // itself: Showdown puts its id on the user as a volatile here, takes
+        // it off after AfterMove and hints if it was still there.
+        let again = self.mon(r).last_move == Some(move_id)
+            && self.dex.mv(move_id).has(MoveFlag::CantUseTwice);
         // beforeMoveCallback: Focus Punch after a hit.
         if self.focus_punch_before_move_callback(r, move_id) {
             self.active_move.cur_move = None;
@@ -257,9 +262,17 @@ impl Battle {
         let r = moved;
         // A called move (Copycat, Sleep Talk) is the active move from here
         // on, and its result is the Pokémon's.
-        let (move_id, result) = self.called_move_result(r, move_id, result);
+        let (called_id, result) = self.called_move_result(r, move_id, result);
         self.mon_mut(r).move_this_turn_result = result;
-        self.run_after_move(r, move_id, target);
+        self.run_after_move(r, called_id, target);
+        // The volatile is gone when the user was switched out in between (a
+        // Red Card), and it was never put on for a move another one called.
+        if again && called_id == move_id && self.mon(r).is_active {
+            let name = &self.dex.mv(move_id).name;
+            self.add(format!(
+                "|-hint|Some effects can force a Pokemon to use {name} again in a row."
+            ));
+        }
         self.faint_messages();
         self.check_win();
     }
@@ -716,6 +729,26 @@ impl Battle {
                 ));
                 self.field.wonder_room_armed = true;
             }
+            // The user's ability and item, and its freeze, have a ModifyMove
+            // handler too (the engine runs them where it needs them). Their
+            // subOrders (7, 8, 0) are none of the others', so they tie with
+            // nothing, but they are in Showdown's list and so in the `len` of
+            // the shuffle that breaks a tie between the others.
+            if let Some(p) = self.dex.ability_handlers[self.mon(r).ability as usize]
+                .priority(Event::ModifyMove, Role::Own)
+            {
+                hs.push(ModHandler::new(p, speed, crate::abilities::SUB_ORDER_ABILITY));
+            }
+            if let Some(item) = self.mon(r).item.filter(|_| !self.mon(r).revived) {
+                if let Some(p) = self.dex.item_handlers[item as usize]
+                    .priority(Event::ModifyMove, Role::Own)
+                {
+                    hs.push(ModHandler::new(p, speed, crate::abilities::SUB_ORDER_ITEM));
+                }
+            }
+            if self.mon(r).status == Status::Frz {
+                hs.push(ModHandler::new(0, speed, 0));
+            }
             if hs.len() > 1 {
                 self.speed_sort_by(&mut hs, compare_mod);
             }
@@ -952,7 +985,15 @@ impl Battle {
                 self.shell_side_arm_on_prepare_hit(r, targets.first().copied(), mv, line);
                 true
             }
-            MoveKind::FakeOut | MoveKind::FirstImpression => self.mon(r).active_move_actions <= 1,
+            // onTry: only on the first turn out (the move's own onTry hints why
+            // it fails; Copycat and Instruct are how a second use is reached).
+            MoveKind::FakeOut | MoveKind::FirstImpression => {
+                let first = self.mon(r).active_move_actions <= 1;
+                if !first {
+                    self.add(format!("|-hint|{} only works on your first turn out.", mv.name));
+                }
+                first
+            }
             // Sucker Punch also fails against a target that must recharge,
             // even when Encore changed its queued action.
             MoveKind::SuckerPunch => {

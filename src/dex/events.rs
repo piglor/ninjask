@@ -9,7 +9,10 @@
 
 use crate::dex::Handlers;
 
-/// The events whose ability and item handlers the engine sorts.
+/// The events whose ability and item handlers the engine sorts. `ModifyMove` and
+/// `Update` are here for the draws their sorts make, not for what the handlers do
+/// (the engine runs those where it needs them): the sort's framing, `shuffle(len, ...)`,
+/// counts every handler Showdown collects.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Event {
     AfterBoost,
@@ -22,6 +25,7 @@ pub enum Event {
     ModifyAtk,
     ModifyBoost,
     ModifyDef,
+    ModifyMove,
     ModifySpA,
     ModifySpD,
     ModifySpe,
@@ -30,10 +34,11 @@ pub enum Event {
     TryBoost,
     TryEatItem,
     TryMove,
+    Update,
 }
 
 impl Event {
-    pub const ALL: [Event; 18] = [
+    pub const ALL: [Event; 20] = [
         Event::AfterBoost,
         Event::AfterEachBoost,
         Event::AfterFaint,
@@ -44,6 +49,7 @@ impl Event {
         Event::ModifyAtk,
         Event::ModifyBoost,
         Event::ModifyDef,
+        Event::ModifyMove,
         Event::ModifySpA,
         Event::ModifySpD,
         Event::ModifySpe,
@@ -52,6 +58,7 @@ impl Event {
         Event::TryBoost,
         Event::TryEatItem,
         Event::TryMove,
+        Event::Update,
     ];
     pub const COUNT: usize = Event::ALL.len();
 
@@ -68,6 +75,7 @@ impl Event {
             Event::ModifyAtk => "ModifyAtk",
             Event::ModifyBoost => "ModifyBoost",
             Event::ModifyDef => "ModifyDef",
+            Event::ModifyMove => "ModifyMove",
             Event::ModifySpA => "ModifySpA",
             Event::ModifySpD => "ModifySpD",
             Event::ModifySpe => "ModifySpe",
@@ -76,6 +84,7 @@ impl Event {
             Event::TryBoost => "TryBoost",
             Event::TryEatItem => "TryEatItem",
             Event::TryMove => "TryMove",
+            Event::Update => "Update",
         }
     }
 }

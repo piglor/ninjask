@@ -35,6 +35,28 @@ def golden_cases() -> tuple[tuple[dict, dict], ...]:
     return tuple(out)
 
 
+@lru_cache(maxsize=1)
+def scenarios() -> tuple[tuple[dict, list[dict]], ...]:
+    """The hand-built scenarios (scripts/areneon/make_scenarios.py): each row with the writes of its draw trace."""
+    with gzip.open(FIXTURES / "scenarios.jsonl.gz", "rt") as f:
+        rows = [json.loads(line) for line in f]
+    with gzip.open(FIXTURES / "scenarios-draws.jsonl.gz", "rt") as f:
+        traces = {t["id"]: t["writes"] for t in map(json.loads, f)}
+    return tuple((row, traces[row["id"]]) for row in rows)
+
+
+@lru_cache(maxsize=1)
+def recorded_checker():
+    """scripts/check_recorded.py, the checker the tests share with the 3,200-battle run, loaded by path."""
+    import importlib.util
+
+    path = Path(__file__).resolve().parents[2] / "scripts" / "check_recorded.py"
+    spec = importlib.util.spec_from_file_location("check_recorded", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def teams() -> list[str]:
     return [t for t in (FIXTURES / "teams.txt").read_text().split("\n") if t]
 

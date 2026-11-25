@@ -65,6 +65,8 @@ def check(row, dex, writes):
 
     # channels and request hashes, through the batched API
     batch = ninjask.Batch(dex, 1, names=NAMES, channels=True)
+    if row.get("turn_limit"):
+        batch.turn_limit = row["turn_limit"]
     batch.reset(0, packed["p1"], packed["p2"], seed)
     seen = {"p1": 0, "p2": 0}
     seq = {"p1": 0, "p2": 0}
@@ -84,9 +86,11 @@ def check(row, dex, writes):
                     # only the current request has candidates
                     got = batch.candidates(0, s)
                     legal = recorded.get("legal")
-                    if legal is None:
+                    if recorded.get("phase") == "wait" or (legal is None and "phase" not in recorded):
                         if got:
                             out["candidates"] = f"{viewer} request {seq[viewer]}: candidates for a wait request"
+                    elif legal is None:
+                        pass  # a recording with no reference lists (scenarios.jsonl.gz): nothing to compare
                     elif [c for c, p in got if not p] != legal["choices"] or [c for c, p in got if p] != legal["pending"]:
                         out["candidates"] = f"{viewer} request {seq[viewer]}"
                 seq[viewer] += 1

@@ -649,7 +649,17 @@ impl Battle {
                     source_slot: r.1,
                     wisher: m.name.to_string(),
                 };
+                let starting_turn = wish.starting_turn;
                 self.slot_conds[t.0][t.1].wish = Some(wish);
+                // `Wish`'s onStart: with the 8-bit turn count (Gen 8+) a Wish
+                // made on the 256th turn counts as made on the 255th and
+                // never comes.
+                if starting_turn == 255 {
+                    let turn = self.turn;
+                    self.add(format!(
+                        "|-hint|In Gen 8+, Wish will never resolve when used on the {turn}th turn."
+                    ));
+                }
                 true
             }
             MoveKind::HealingWish => {
