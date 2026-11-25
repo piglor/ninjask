@@ -10,6 +10,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import re
+from pathlib import Path
 
 import pytest
 
@@ -123,8 +124,8 @@ def test_the_export_refuses_a_checkout_that_is_not_the_pin(tmp_path):
 
     refsim = tmp_path / "refsim"
     refsim.mkdir()
-    for name in ("export_format.js", "showdown_path.js"):
-        shutil.copy(REFSIM_DIR / name, refsim / name)
+    for name in repin.TOOL_FILES:  # the tool is several files (export_format.js reads the others)
+        shutil.copy(REFSIM_DIR / Path(name).name, refsim / Path(name).name)
     env = {"PATH": os.environ["PATH"], "NINJASK_SHOWDOWN": str(SHOWDOWN_DIR)}
     run = lambda: subprocess.run(  # noqa: E731
         ["node", str(refsim / "export_format.js"), "gen9championsvgc2026regmc"], env=env, capture_output=True, text=True

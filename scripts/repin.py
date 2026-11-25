@@ -35,7 +35,7 @@ FORMATS = (
     "gen9championsvgc2026regmb",
     "gen9championsdoublescustomgame",
 )
-TOOL_FILES = ("refsim/export_format.js", "refsim/showdown_path.js")
+TOOL_FILES = ("refsim/export_banner.js", "refsim/export_format.js", "refsim/showdown_path.js")
 SECTIONS = ("format", "species", "learnsets", "moves", "items", "abilities", "natures", "typechart", "conditions")
 SCHEMA = 1
 

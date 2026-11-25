@@ -737,11 +737,15 @@ impl Battle {
             if let Some(p) = self.dex.ability_handlers[self.mon(r).ability as usize]
                 .priority(Event::ModifyMove, Role::Own)
             {
-                hs.push(ModHandler::new(p, speed, crate::abilities::SUB_ORDER_ABILITY));
+                hs.push(ModHandler::new(
+                    p,
+                    speed,
+                    crate::abilities::SUB_ORDER_ABILITY,
+                ));
             }
             if let Some(item) = self.mon(r).item.filter(|_| !self.mon(r).revived) {
-                if let Some(p) = self.dex.item_handlers[item as usize]
-                    .priority(Event::ModifyMove, Role::Own)
+                if let Some(p) =
+                    self.dex.item_handlers[item as usize].priority(Event::ModifyMove, Role::Own)
                 {
                     hs.push(ModHandler::new(p, speed, crate::abilities::SUB_ORDER_ITEM));
                 }
@@ -990,7 +994,10 @@ impl Battle {
             MoveKind::FakeOut | MoveKind::FirstImpression => {
                 let first = self.mon(r).active_move_actions <= 1;
                 if !first {
-                    self.add(format!("|-hint|{} only works on your first turn out.", mv.name));
+                    self.add(format!(
+                        "|-hint|{} only works on your first turn out.",
+                        mv.name
+                    ));
                 }
                 first
             }

@@ -45,11 +45,15 @@ impl Battle {
             .into_iter()
             .map(|(_, k)| (ModHandler::new(0, speed, 2), Some(k)))
             .collect();
-        if let Some(p) = self.dex.ability_handlers[m.ability as usize].priority(Event::Update, Role::Own) {
+        if let Some(p) =
+            self.dex.ability_handlers[m.ability as usize].priority(Event::Update, Role::Own)
+        {
             keyed.push((ModHandler::new(p, speed, SUB_ORDER_ABILITY), None));
         }
         if let Some(item) = m.item.filter(|_| !m.revived) {
-            if let Some(p) = self.dex.item_handlers[item as usize].priority(Event::Update, Role::Own) {
+            if let Some(p) =
+                self.dex.item_handlers[item as usize].priority(Event::Update, Role::Own)
+            {
                 keyed.push((ModHandler::new(p, speed, SUB_ORDER_ITEM), None));
             }
         }

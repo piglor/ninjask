@@ -603,7 +603,7 @@ fn observe_and_step_still_work_beside_channels() {
         assert_eq!(batch.pending().len(), m);
         let picks: Vec<(usize, usize, usize)> = (0..m)
             .map(|k| {
-                let n = (o.offsets[k + 1] - o.offsets[k]) as u32;
+                let n = o.offsets[k + 1] - o.offsets[k];
                 (
                     o.who[2 * k] as usize,
                     o.who[2 * k + 1] as usize,
