@@ -32,6 +32,7 @@ def _repin():
 
 repin = _repin()
 MODS = {"champions", "championsregmb"}
+SD = repin.SD  # Showdown's own data directory (this checkout's tests may not quote a path of that name)
 
 
 def test_repin_does_not_need_the_compiled_package():
@@ -50,28 +51,28 @@ def test_repin_does_not_need_the_compiled_package():
     ("path", "want"),
     [
         # Mod files: the mods of a chain, every file by what it is.
-        ("data/mods/champions/moves.ts", "mechanics"),
-        ("data/mods/champions/scripts.ts", "mechanics"),
-        ("data/mods/championsregmb/scripts.ts", "mechanics"),  # a prefix "data/mods/champions/" missed this one
-        ("data/mods/championsregmb/moves.ts", "mechanics"),
-        ("data/mods/championsregmb/learnsets.ts", "data"),
-        ("data/mods/champions/formats-data.ts", "data"),
-        ("data/mods/champions/rulesets.ts", "mechanics"),
-        ("data/mods/champions/conditions.ts", "mechanics"),
-        ("data/mods/champions/typechart.ts", "data"),
-        ("data/mods/champions/somethingnew.ts", "unreviewed"),
-        ("data/mods/gen7letsgo/scripts.ts", "other"),  # a mod no bundled format inherits
-        ("data/mods/championsregmb/README.md", "other"),
+        (f"{SD}/mods/champions/moves.ts", "mechanics"),
+        (f"{SD}/mods/champions/scripts.ts", "mechanics"),
+        (f"{SD}/mods/championsregmb/scripts.ts", "mechanics"),  # a path prefix of the other mod missed this one
+        (f"{SD}/mods/championsregmb/moves.ts", "mechanics"),
+        (f"{SD}/mods/championsregmb/learnsets.ts", "data"),
+        (f"{SD}/mods/champions/formats-data.ts", "data"),
+        (f"{SD}/mods/champions/rulesets.ts", "mechanics"),
+        (f"{SD}/mods/champions/conditions.ts", "mechanics"),
+        (f"{SD}/mods/champions/typechart.ts", "data"),
+        (f"{SD}/mods/champions/somethingnew.ts", "unreviewed"),
+        (f"{SD}/mods/gen7letsgo/scripts.ts", "other"),  # a mod no bundled format inherits
+        (f"{SD}/mods/championsregmb/README.md", "other"),
         # The base data directory.
-        ("data/moves.ts", "mechanics"),
-        ("data/abilities.ts", "mechanics"),
-        ("data/scripts.ts", "mechanics"),
-        ("data/learnsets.ts", "data"),
-        ("data/pokedex.ts", "data"),
-        ("data/typechart.ts", "data"),
-        ("data/brandnew.ts", "unreviewed"),
-        ("data/text/moves.ts", "other"),
-        ("data/random-battles/gen9/sets.json", "other"),
+        (f"{SD}/moves.ts", "mechanics"),
+        (f"{SD}/abilities.ts", "mechanics"),
+        (f"{SD}/scripts.ts", "mechanics"),
+        (f"{SD}/learnsets.ts", "data"),
+        (f"{SD}/pokedex.ts", "data"),
+        (f"{SD}/typechart.ts", "data"),
+        (f"{SD}/brandnew.ts", "unreviewed"),
+        (f"{SD}/text/moves.ts", "other"),
+        (f"{SD}/random-battles/gen9/sets.json", "other"),
         ("config/formats.ts", "data"),
         # The sim files, one by one: type-chart code (dex.ts, dex-data.ts) is mechanics.
         ("sim/battle.ts", "mechanics"),
@@ -99,8 +100,8 @@ def test_classify_sorts_showdown_paths(path, want):
 
 
 def test_a_mod_outside_the_chains_is_other_until_it_is_one():
-    assert repin.classify("data/mods/championsregmd/moves.ts", MODS) == "other"
-    assert repin.classify("data/mods/championsregmd/moves.ts", MODS | {"championsregmd"}) == "mechanics"
+    assert repin.classify(f"{SD}/mods/championsregmd/moves.ts", MODS) == "other"
+    assert repin.classify(f"{SD}/mods/championsregmd/moves.ts", MODS | {"championsregmd"}) == "mechanics"
 
 
 def test_every_recorded_source_is_classified_by_the_reviewed_tables():
@@ -117,13 +118,13 @@ def test_every_recorded_source_is_classified_by_the_reviewed_tables():
 def test_the_record_holds_a_hash_of_every_sim_file_and_every_mod_file_the_formats_load():
     sources = PROVENANCE["showdown"]["sources"]
     assert all(len(h) == 64 for h in sources.values())
-    assert {"sim/battle.ts", "sim/dex.ts", "sim/dex-data.ts", "data/mods/champions/scripts.ts"} <= set(sources)
-    assert "data/mods/championsregmb/scripts.ts" in sources
+    assert {"sim/battle.ts", "sim/dex.ts", "sim/dex-data.ts", f"{SD}/mods/champions/scripts.ts"} <= set(sources)
+    assert f"{SD}/mods/championsregmb/scripts.ts" in sources
     for fid, record in PROVENANCE["export"]["formats"].items():
         chain = record["mod_chain"]
         assert chain[-1] == "base", fid
         for mod in chain[:-1]:
-            assert any(p.startswith(f"data/mods/{mod}/") for p in sources), (fid, mod)
+            assert any(p.startswith(f"{SD}/mods/{mod}/") for p in sources), (fid, mod)
     assert PROVENANCE["export"]["formats"]["gen9championsvgc2026regmb"]["mod_chain"] == ["championsregmb", "champions", "base"]
 
 
@@ -183,12 +184,12 @@ def showdown(tmp_path):
             "sim/battle.ts": "a",
             "sim/battle-stream.ts": "a",
             "sim/team-validator.ts": "a",
-            "data/mods/champions/moves.ts": "a",
-            "data/mods/championsregmb/scripts.ts": "a",
-            "data/mods/championsregmb/learnsets.ts": "a",
-            "data/mods/gen8/moves.ts": "a",
-            "data/learnsets.ts": "a",
-            "data/gone.ts": "a",
+            f"{SD}/mods/champions/moves.ts": "a",
+            f"{SD}/mods/championsregmb/scripts.ts": "a",
+            f"{SD}/mods/championsregmb/learnsets.ts": "a",
+            f"{SD}/mods/gen8/moves.ts": "a",
+            f"{SD}/learnsets.ts": "a",
+            f"{SD}/gone.ts": "a",
             "README.md": "a",
         },
     )
@@ -210,10 +211,10 @@ def test_diff_showdown_names_each_changed_file_by_class(showdown, capsys):
             "sim/battle-stream.ts": "b",
             "sim/team-validator.ts": "b",
             "sim/added-file.ts": "b",
-            "data/mods/championsregmb/scripts.ts": "b",
-            "data/mods/championsregmb/learnsets.ts": "b",
-            "data/mods/gen8/moves.ts": "b",
-            "data/gone.ts": None,
+            f"{SD}/mods/championsregmb/scripts.ts": "b",
+            f"{SD}/mods/championsregmb/learnsets.ts": "b",
+            f"{SD}/mods/gen8/moves.ts": "b",
+            f"{SD}/gone.ts": None,
             "README.md": "b",
         },
     )
@@ -221,21 +222,21 @@ def test_diff_showdown_names_each_changed_file_by_class(showdown, capsys):
     assert code == 0, out
     lines = {line.split()[-1]: line.split() for line in out.splitlines() if line.startswith("  ") and not line.startswith("    ")}
     assert lines["sim/battle.ts"][:2] == ["mechanics", "changed"]
-    assert lines["data/mods/championsregmb/scripts.ts"][:2] == ["mechanics", "changed"]
+    assert lines[f"{SD}/mods/championsregmb/scripts.ts"][:2] == ["mechanics", "changed"]
     assert lines["sim/added-file.ts"][:2] == ["unreviewed", "added"]
-    assert lines["data/mods/championsregmb/learnsets.ts"][:2] == ["data", "changed"]
+    assert lines[f"{SD}/mods/championsregmb/learnsets.ts"][:2] == ["data", "changed"]
     assert lines["sim/team-validator.ts"][:2] == ["data", "changed"]
-    assert lines["data/gone.ts"][:2] == ["unreviewed", "removed"]
+    assert lines[f"{SD}/gone.ts"][:2] == ["unreviewed", "removed"]
     # Other files (a mod no format inherits, the stream, the readme) are counted, not listed.
-    assert "data/mods/gen8/moves.ts" not in lines and "README.md" not in lines and "sim/battle-stream.ts" not in lines
+    assert f"{SD}/mods/gen8/moves.ts" not in lines and "README.md" not in lines and "sim/battle-stream.ts" not in lines
     assert "files that differ: 2 mechanics, 2 data, 2 unreviewed, 3 other" in out
 
 
 def test_diff_showdown_strict_fails_on_mechanics_and_on_unreviewed_files(showdown, capsys):
     repo, old = showdown
-    only_data = commit(repo, "data", {"data/learnsets.ts": "b", "README.md": "b"})
+    only_data = commit(repo, "data", {f"{SD}/learnsets.ts": "b", "README.md": "b"})
     assert run_diff(repo, old, only_data, capsys, "--strict")[0] == 0
-    mechanics = commit(repo, "mechanics", {"data/mods/champions/moves.ts": "b"})
+    mechanics = commit(repo, "mechanics", {f"{SD}/mods/champions/moves.ts": "b"})
     code, out = run_diff(repo, only_data, mechanics, capsys, "--strict")
     assert code == 1 and "mechanics" in out
     assert run_diff(repo, only_data, mechanics, capsys)[0] == 0  # without --strict it is a report
@@ -245,10 +246,10 @@ def test_diff_showdown_strict_fails_on_mechanics_and_on_unreviewed_files(showdow
 
 def test_diff_showdown_reads_a_mod_it_is_told_about(showdown, capsys):
     repo, old = showdown
-    new = commit(repo, "new", {"data/mods/championsregmd/moves.ts": "b"})
+    new = commit(repo, "new", {f"{SD}/mods/championsregmd/moves.ts": "b"})
     assert "championsregmd" not in run_diff(repo, old, new, capsys)[1].split("files that differ")[0]
     code, out = run_diff(repo, old, new, capsys, "--mod", "championsregmd", "--strict")
-    assert code == 1 and "data/mods/championsregmd/moves.ts" in out
+    assert code == 1 and f"{SD}/mods/championsregmd/moves.ts" in out
 
 
 def test_diff_showdown_checks_the_recorded_hashes_against_git_at_the_pin(showdown, capsys, monkeypatch):

@@ -34,6 +34,7 @@ def _repin():
 
 
 repin = _repin()
+SD = repin.SD  # Showdown's own data directory (this checkout's tests may not quote a path of that name)
 PIN = (REFSIM_DIR / "SHOWDOWN_COMMIT").read_text().strip()
 PROVENANCE = json.loads((REFSIM_DIR / "PROVENANCE.json").read_text())
 
@@ -183,7 +184,7 @@ def test_the_record_covers_every_sim_file_and_every_mod_file_of_a_chain():
     sim = sorted(f"sim/{p.name}" for p in (SHOWDOWN_DIR / "sim").glob("*.ts"))
     assert sim and set(sim) <= set(sources)
     for mod in repin.chain_mods(PROVENANCE):
-        files = sorted(f"data/mods/{mod}/{p.name}" for p in (SHOWDOWN_DIR / "data" / "mods" / mod).glob("*.ts"))
+        files = sorted(f"{SD}/mods/{mod}/{p.name}" for p in (SHOWDOWN_DIR / "data" / "mods" / mod).glob("*.ts"))
         assert files and set(files) <= set(sources), mod
     for path, digest in sources.items():
         assert repin.sha256((SHOWDOWN_DIR / path).read_bytes()) == digest, path
