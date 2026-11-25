@@ -274,3 +274,72 @@ def test_diff_showdown_lists_commits_with_their_files(showdown, capsys):
     out = run_diff(repo, old, new, capsys)[1]
     assert "1 commit(s)" in out and "touch the battle" in out
     assert "mechanics sim/battle.ts" in " ".join(out.split())
+
+
+# provenance check-data: exports made elsewhere (a build's data directory) against the record
+
+
+def record_of(**formats: bytes) -> dict:
+    return {
+        "export": {
+            "formats": {
+                name: {"bytes": len(data), "sha256": repin.sha256(data), "mod_chain": ["champions", "base"]}
+                for name, data in formats.items()
+            }
+        }
+    }
+
+
+def write_exports(directory: Path, **formats: bytes) -> Path:
+    (directory / "format").mkdir(parents=True, exist_ok=True)
+    for name, data in formats.items():
+        (directory / "format" / f"{name}.json").write_bytes(data)
+    return directory
+
+
+def test_check_data_accepts_exports_that_are_the_recorded_ones(tmp_path):
+    record = record_of(a=b'{"a":1}', b=b'{"b":2}')
+    write_exports(tmp_path, a=b'{"a":1}', b=b'{"b":2}')
+    assert repin.check_data(tmp_path, record) == []
+
+
+def test_check_data_names_a_missing_a_changed_and_a_resized_export(tmp_path):
+    record = record_of(a=b'{"a":1}', b=b'{"b":2}', c=b'{"c":3}')
+    write_exports(tmp_path, a=b'{"a":2}', b=b'{"b":2}')  # a differs, c is missing
+    problems = repin.check_data(tmp_path, record)
+    assert len(problems) == 2
+    assert any("a.json" in p and "differs" in p for p in problems)
+    assert any("c.json" in p and "missing" in p for p in problems)
+
+
+def test_check_data_takes_a_subset_and_ignores_files_the_record_does_not_list(tmp_path):
+    record = record_of(a=b'{"a":1}', b=b'{"b":2}')
+    write_exports(tmp_path, a=b'{"a":1}', extra=b"anything")
+    assert repin.check_data(tmp_path, record, only=["a"]) == []
+    assert len(repin.check_data(tmp_path, record)) == 1  # b is missing
+    assert repin.check_data(tmp_path, record, only=["nope"]) == ["nope: the record lists no such format"]
+
+
+def test_check_data_command_exit_codes(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(repin, "load_provenance", lambda: record_of(a=b'{"a":1}'))
+    write_exports(tmp_path, a=b'{"a":1}')
+    assert repin.main(["provenance", "check-data", str(tmp_path)]) == 0
+    assert "ok" in capsys.readouterr().out
+    write_exports(tmp_path, a=b'{"a":9}')
+    assert repin.main(["provenance", "check-data", str(tmp_path)]) == 1
+    assert "differs" in capsys.readouterr().out
+    monkeypatch.setattr(repin, "load_provenance", lambda: None)
+    assert repin.main(["provenance", "check-data", str(tmp_path)]) == 1
+    with pytest.raises(SystemExit):  # the directory is required
+        repin.main(["provenance", "check-data"])
+
+
+@pytest.mark.skipif(not (repin.SHOWDOWN_DIR / "dist").exists(), reason="Pokémon Showdown not built")
+def test_check_data_accepts_a_real_export_and_catches_a_changed_byte(tmp_path):
+    formats = tuple(PROVENANCE["export"]["formats"])
+    exports = {f: repin.export_bytes(f) for f in formats}
+    write_exports(tmp_path, **exports)
+    assert repin.check_data(tmp_path, PROVENANCE) == []
+    first = tmp_path / "format" / f"{formats[0]}.json"
+    first.write_bytes(first.read_bytes().replace(b"showdownCommit", b"showdownCommiT", 1))
+    assert len(repin.check_data(tmp_path, PROVENANCE)) == 1
