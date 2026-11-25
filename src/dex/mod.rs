@@ -241,6 +241,9 @@ pub struct FormatInfo {
     /// engine's log does not carry (`crate::channel`); `None` in an export
     /// made without them.
     pub banner: Option<crate::channel::Banner>,
+    /// The Showdown commit the export says it is from (`format.showdownCommit`); none for a
+    /// hand-made export (a test fixture). Only [`Dex::from_json_unpinned`] loads such a dex.
+    pub showdown_commit: Option<String>,
 }
 
 /// FxHash (as in rustc) for the dex's lookups by id, which run during
@@ -377,7 +380,34 @@ fn fraction(v: &Value) -> Option<(u32, u32)> {
 }
 
 impl Dex {
+    /// Load an export written by `refsim/export_format.js`, if it is from the Showdown commit
+    /// this engine is a port of ([`crate::SHOWDOWN_COMMIT`]). An export of another commit would be
+    /// played as if it were the pin's, and one that names no commit is not an export of that
+    /// script: both are errors. [`Dex::from_json_unpinned`] is the explicit way to load them.
     pub fn from_json(text: &str) -> Result<Dex, String> {
+        let dex = Self::from_json_unpinned(text)?;
+        match dex.format.showdown_commit.as_deref() {
+            Some(c) if c == crate::SHOWDOWN_COMMIT => Ok(dex),
+            Some(c) => Err(format!(
+                "the export is from Showdown commit {c}, but this engine is a port of {} \
+                 (export the format again from the pinned checkout, see docs/repin.md; \
+                 `Dex::from_json_unpinned`, `allow_unpinned=True` in Python, loads an export of \
+                 another commit anyway)",
+                crate::SHOWDOWN_COMMIT
+            )),
+            None => Err(format!(
+                "the export names no Showdown commit (`format.showdownCommit`): it is not an \
+                 export of refsim/export_format.js, so it cannot be held to the pin {} \
+                 (`Dex::from_json_unpinned`, `allow_unpinned=True` in Python, loads a hand-made export)",
+                crate::SHOWDOWN_COMMIT
+            )),
+        }
+    }
+
+    /// Like [`Dex::from_json`], without the check of the export's commit: for a hand-made export
+    /// (a test fixture) or one of another commit that the caller has checked. The engine's
+    /// handlers are ported from the pinned commit, so data from another one can disagree with them.
+    pub fn from_json_unpinned(text: &str) -> Result<Dex, String> {
         let root: Value = serde_json::from_str(text).map_err(|e| e.to_string())?;
         let f = &root["format"];
         let format = FormatInfo {
@@ -392,6 +422,7 @@ impl Dex {
                 Value::Null => None,
                 b => Some(crate::channel::Banner::from_json(b)?),
             },
+            showdown_commit: f["showdownCommit"].as_str().map(str::to_string),
         };
 
         // Types: every key of the type chart is a type; inner keys that are

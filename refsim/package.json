@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "type": "commonjs",
+  "description": "The reference harness (export_format.js, source_files.js, server.js, ...) is CommonJS. This file keeps it so when the engine is vendored into a project whose own package.json says \"type\": \"module\"."
+}

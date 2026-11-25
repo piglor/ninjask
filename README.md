@@ -316,6 +316,16 @@ harness on a few games.
 - **One pinned Showdown.** Parity is with commit `7244fe8` (2026-10-16; upstream Ninjask: `3a766f2`).
   Changes Showdown makes after it are not followed until the pin moves. The
   tracker reads logs from the live server, which may run a newer version.
+- **A trap on a No Retreat user whose trapper is hidden is a guess.** The world
+  projection (`src/world.rs`, used by the tracker's worlds and the engine-computed
+  features) takes a `trapped` volatile that the view cannot attribute to any Pokémon, on
+  a Pokémon that also holds No Retreat, to be No Retreat's own trap, which nothing
+  releases. Showdown adds no trap of its own to a user that is already trapped, so if
+  the Pokémon had been trapped by a move whose user the view could not name (Mean Look,
+  Block, Spirit Shackle...), Showdown frees it when that user leaves and the projection
+  does not. Battles played in the engine from their start are not affected (they
+  track every trap), and it needs a hidden trapper, a No Retreat user and a worlds
+  projection at once.
 - **Wheels** are for CPython 3.12 and later on the platforms listed in the
   quick start; PyPy, free-threaded CPython (3.14t) and other platforms build
   from source and need Rust.
@@ -375,6 +385,22 @@ exported format is derived rather than Showdown's own:
 base format with its sheet rule forced open, built by `refsim/export_format.js`;
 its `FormatSpec` reports `open_team_sheets` and the base format it derives from.
 
+**An export is taken only from the pinned commit.** `Dex::from_json` and `Dex.load`
+refuse an export whose `format.showdownCommit` is not `SHOWDOWN_COMMIT` (or that names no
+commit: it is not an export of `refsim/export_format.js`), because the engine's handlers are
+ported from that commit and data from another one would be played as if it were the pin's.
+`Dex::from_json_unpinned` (Rust) and `allow_unpinned=True` (Python: `Dex.load`, `ninjask.dex`,
+`ninjask.load`, `ninjask.format.export_path`) are the explicit override, for a hand-made
+export (the committed test fixture is one) or one of another commit that you have checked.
+
+**Loading a format in an installed wheel**, which has no Showdown to export from: give it a
+directory that holds the exports as `format/<id>.json` (the layout of `data/derived/`), either
+through the environment, `NINJASK_DATA=<dir>`, or per call, `ninjask.dex(id, data_dir=<dir>)` and
+`ninjask.load(id, data_dir=<dir>)`. Make the exports in a source checkout with
+`node refsim/export_format.js <id> > <dir>/format/<id>.json` (or `ninjask.load(id)` there, which
+writes them into its own `data/derived/format/`); a file in the directory from another commit is an
+error, never exported again over the directory you named.
+
 ### Run the checks
 
 ```sh
@@ -421,9 +447,10 @@ as a pool to verify on.
 
 **Rust** (`ninjask` crate; `cargo doc --open`)
 
-- `Dex::from_json(text)`: the loaded format. Immutable, shared between
-  battles through an `Arc`. Looks up species, moves, items, abilities and the
-  type chart, and reports support.
+- `Dex::from_json(text)`: the loaded format, from an export of the pinned
+  Showdown commit (`Dex::from_json_unpinned` for a hand-made one). Immutable,
+  shared between battles through an `Arc`. Looks up species, moves, items,
+  abilities and the type chart, and reports support.
 - `Battle::new(dex, [team1, team2], names, seed)`: a battle from two packed
   teams. `Battle::new_with_rng` takes a given `Rng` (reference mode uses Showdown's);
   `Battle::from_sets` takes parsed teams. For many games over one pool,
@@ -470,7 +497,7 @@ as a pool to verify on.
 **Python, compiled classes** (`ninjask.Dex`, `ninjask.Battle`, `ninjask.Tracker`;
 built from `src/python.rs` as `ninjask._core` and re-exported by the package)
 
-- `Dex.load(path)`, `.team_problems(packed)`, `.move_support(id)`,
+- `Dex.load(path, *, allow_unpinned=False)`, `.team_problems(packed)`, `.move_support(id)`,
   `.species_ids()`, `.generic_moves()`, `.implemented_moves()`,
   `.supported_abilities()`, `.supported_items()`, `.vocab()` (embedding-table
   sizes for `Tracker.encode_ids()`).
@@ -526,7 +553,9 @@ built from `src/python.rs` as `ninjask._core` and re-exported by the package)
 - `paths`: where Showdown and generated data live. Defaults are inside the
   checkout (`third_party/`, `data/derived/`); override with `NINJASK_HOME`,
   `NINJASK_SHOWDOWN` and `NINJASK_DATA`. `NINJASK_POOL` sets the default team
-  pool of the checks.
+  pool of the checks. `NINJASK_EXTENSION` names a module that provides the
+  compiled classes instead of `ninjask._core` (see "Embedding in another
+  extension").
 
 ## Enumerating chance outcomes (experimental)
 
@@ -663,10 +692,18 @@ package to take its classes from it:
    myproject = "my_module"
    ```
 
+4. Name it in the process: `NINJASK_EXTENSION=myproject` (the entry point's
+   name) before `import ninjask`. **A declaration alone does nothing**: any
+   installed distribution can declare the group, and the module it names would
+   replace the engine's classes in every program that imports `ninjask`, so by
+   default only `ninjask._core` is ever imported (a warning says that a
+   declared module was ignored). An unknown name is an `ImportError`, not a
+   fall-back to the engine.
+
 `import ninjask` then re-exports `my_module.Dex`, `.Battle` and `.Tracker`
 (`ninjask/_extension.py`), so `ninjask.Battle is my_module.Battle`, and
 everything in the package, the checks included, uses them. `ninjask._core` is
-used only when no module is declared, so the package's Python files are all
+used when no module is named, so the package's Python files are all
 you need besides your own module (for example, `python/` on your project's
 path), plus the bundled formats: a checkout's `python/ninjask/data/` is
 empty until `scripts/bundle_data.sh` fills it (or copy it from the wheel), and

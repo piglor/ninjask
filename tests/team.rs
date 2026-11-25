@@ -16,7 +16,7 @@ use ninjask::{Battle, Dex};
 fn setup() -> Option<(Arc<Dex>, Vec<Vec<MonSet>>)> {
     let json = common::format_export("gen9championsvgc2026regmc")?;
     let root = env!("CARGO_MANIFEST_DIR");
-    let dex = Arc::new(Dex::from_json(&json).ok()?);
+    let dex = Arc::new(Dex::from_json(&json).expect("the format export loads"));
     let teams = std::fs::read_to_string(format!("{root}/tests/fixtures/regmc_teams.txt"))
         .ok()?
         .lines()

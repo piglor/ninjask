@@ -644,7 +644,8 @@ impl<'a> Builder<'a> {
                 }
                 "trapped" => match source(id) {
                     Some(src) => json!({"linkedStatus": "trapper", "linked": [src]}),
-                    // No Retreat's own: nothing is linked.
+                    // No Retreat's own: nothing is linked. A guess when the trapper is hidden
+                    // (README, Known limitations): a user already trapped keeps that trap.
                     None if m.volatiles.iter().any(|v| v == "noretreat") => json!({}),
                     None => json!({"linkedStatus": "trapper", "linked": []}),
                 },

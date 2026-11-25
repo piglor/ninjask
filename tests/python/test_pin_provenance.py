@@ -34,6 +34,7 @@ def _repin():
 
 
 repin = _repin()
+SD = repin.SD  # Showdown's own data directory (this checkout's tests may not quote a path of that name)
 PIN = (REFSIM_DIR / "SHOWDOWN_COMMIT").read_text().strip()
 PROVENANCE = json.loads((REFSIM_DIR / "PROVENANCE.json").read_text())
 
@@ -49,6 +50,8 @@ def test_the_pin_is_in_the_compiled_module_and_the_provenance_record():
     assert PROVENANCE["showdown"]["commit"] == PIN
     assert PROVENANCE["showdown"]["repository"] == "https://github.com/smogon/pokemon-showdown"
     assert PIN not in [p["commit"] for p in PROVENANCE["showdown"]["previous_pins"]]
+    # The pin this one replaced (the 0.4.1 engine's) is on record.
+    assert "3a766f2cfb5e51c1e428cfe87d0dba91a8f01640" in [p["commit"] for p in PROVENANCE["showdown"]["previous_pins"]]
 
 
 def test_the_notice_and_the_readme_name_the_pin():
@@ -145,6 +148,84 @@ def test_the_export_refuses_a_checkout_that_is_not_the_pin(tmp_path):
     assert json.loads(unpinned.stdout)["format"]["showdownCommit"] == PIN  # the checkout's own commit
 
 
+@needs_showdown
+def test_the_source_lister_refuses_a_checkout_that_is_not_the_pin(tmp_path):
+    """`refsim/source_files.js` makes the record of the Showdown sources: like the export, it is only
+    the pin's if the checkout is the pin."""
+    import os
+    import shutil
+    import subprocess
+
+    refsim = tmp_path / "refsim"
+    refsim.mkdir()
+    for name in repin.TOOL_FILES:
+        shutil.copy(ENGINE_ROOT / name, refsim / Path(name).name)
+    env = {"PATH": os.environ["PATH"], "NINJASK_SHOWDOWN": str(SHOWDOWN_DIR)}
+    run = lambda *ids: subprocess.run(  # noqa: E731
+        ["node", str(refsim / "source_files.js"), *ids], env=env, capture_output=True, text=True
+    )
+    (refsim / "SHOWDOWN_COMMIT").write_text(PIN + "\n")
+    ok = run("gen9championsvgc2026regmb")
+    assert ok.returncode == 0, ok.stderr
+    listed = json.loads(ok.stdout)
+    assert listed["commit"] == PIN
+    assert listed["formats"] == {"gen9championsvgc2026regmb": {"mod_chain": ["championsregmb", "champions", "base"]}}
+    assert run().returncode == 2  # no format named
+    (refsim / "SHOWDOWN_COMMIT").write_text("0" * 40 + "\n")
+    bad = run("gen9championsvgc2026regmb")
+    assert bad.returncode != 0 and f"the pin is {'0' * 40}" in bad.stderr, bad.stderr
+
+
+@needs_showdown
+def test_the_record_covers_every_sim_file_and_every_mod_file_of_a_chain():
+    """The sources are found, not listed: every `sim/*.ts` of the checkout and every `.ts` file of a mod in a
+    format's chain is in the record, with the hash of the file as it is."""
+    sources = PROVENANCE["showdown"]["sources"]
+    sim = sorted(f"sim/{p.name}" for p in (SHOWDOWN_DIR / "sim").glob("*.ts"))
+    assert sim and set(sim) <= set(sources)
+    for mod in repin.chain_mods(PROVENANCE):
+        files = sorted(f"{SD}/mods/{mod}/{p.name}" for p in (SHOWDOWN_DIR / "data" / "mods" / mod).glob("*.ts"))
+        assert files and set(files) <= set(sources), mod
+    for path, digest in sources.items():
+        assert repin.sha256((SHOWDOWN_DIR / path).read_bytes()) == digest, path
+    # Every path in the record is a place the classification knows (no "unreviewed" file is recorded).
+    mods = repin.chain_mods(PROVENANCE)
+    assert [p for p in sources if repin.classify(p, mods) == "unreviewed"] == []
+
+
+@needs_showdown
+def test_the_node_tools_are_commonjs_inside_a_project_whose_package_is_a_module(tmp_path):
+    """The engine is vendored into other repositories (a git submodule). Node reads a `.js` file by the nearest
+    `package.json`, and a project that sets `"type": "module"` would make these scripts ES modules and break
+    `require`: refsim/package.json says commonjs for the directory."""
+    import os
+    import shutil
+    import subprocess
+
+    project = tmp_path / "project"
+    (project / "vendor" / "ninjask").mkdir(parents=True)
+    (project / "package.json").write_text('{"name": "enclosing", "private": true, "type": "module"}')
+    refsim = project / "vendor" / "ninjask" / "refsim"
+    shutil.copytree(REFSIM_DIR, refsim, ignore=shutil.ignore_patterns("PROVENANCE.json", "node_modules"))
+    env = {"PATH": os.environ["PATH"], "NINJASK_SHOWDOWN": str(SHOWDOWN_DIR)}
+    run = lambda tool: subprocess.run(  # noqa: E731
+        ["node", str(refsim / tool), "gen9championsvgc2026regmc"], env=env, capture_output=True, text=True, cwd=project
+    )
+    for tool in ("export_format.js", "source_files.js"):
+        done = run(tool)
+        assert done.returncode == 0, (tool, done.stderr[:300])
+    assert json.loads((refsim / "package.json").read_text())["type"] == "commonjs"
+    # Without it the enclosing project's type decides, and the tools fail: the file is what makes them work.
+    (refsim / "package.json").unlink()
+    assert "require is not defined" in run("export_format.js").stderr
+
+
+def test_the_source_lister_names_no_mod_and_no_format():
+    """Mod chains come from Showdown's Dex, not from this file."""
+    text = (ENGINE_ROOT / "refsim" / "source_files.js").read_text()
+    assert "champions" not in text and "gen9" not in text
+
+
 # The helpers of scripts/repin.py, on small inputs.
 
 
@@ -183,18 +264,6 @@ def test_diff_exports_names_entities_and_changed_handlers():
         "moves: changed x: callbackHashes; callbacks -['condition.onTrapPokemon'] +[]",
     ]
     assert repin.diff_exports(new, new) == []
-
-
-def test_classify_sorts_showdown_paths():
-    sd = repin.SD  # Showdown's data directory
-    assert repin.classify(f"{sd}/mods/champions/moves.ts") == "mechanics"
-    assert repin.classify(f"{sd}/moves.ts") == "mechanics"
-    assert repin.classify("sim/battle-actions.ts") == "mechanics"
-    assert repin.classify(f"{sd}/formats-data.ts") == "data"
-    assert repin.classify("sim/team-validator.ts") == "data"
-    assert repin.classify("server/chat-plugins/teams.ts") == "other"
-    assert repin.classify(f"{sd}/mods/gen7letsgo/scripts.ts") == "other"
-    assert repin.classify("test/sim/champions.js") == "other"
 
 
 def test_differences_lists_what_moved():

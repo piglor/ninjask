@@ -187,12 +187,21 @@ pub struct PyDex {
 
 #[pymethods]
 impl PyDex {
-    /// Load an export written by refsim/export_format.js.
+    /// Load an export written by refsim/export_format.js. It must be from the Showdown commit
+    /// the engine is a port of (`SHOWDOWN_COMMIT`): an export of another commit, or one that
+    /// names none, raises `ValueError` unless `allow_unpinned` is set (a hand-made export, or
+    /// one of another commit that you have checked).
     #[staticmethod]
-    fn load(path: &str) -> PyResult<PyDex> {
+    #[pyo3(signature = (path, *, allow_unpinned=false))]
+    fn load(path: &str, allow_unpinned: bool) -> PyResult<PyDex> {
         let text =
             std::fs::read_to_string(path).map_err(|e| PyValueError::new_err(e.to_string()))?;
-        let dex = Dex::from_json(&text).map_err(PyValueError::new_err)?;
+        let dex = if allow_unpinned {
+            Dex::from_json_unpinned(&text)
+        } else {
+            Dex::from_json(&text)
+        }
+        .map_err(PyValueError::new_err)?;
         Ok(PyDex {
             inner: Arc::new(dex),
         })
