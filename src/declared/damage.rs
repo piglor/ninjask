@@ -89,9 +89,11 @@ impl Prober {
         b.active_move.cur_user = Some(ATTACKER);
         self.target_gate(move_id)?;
         // The steps the reference runs before the damage loop: a stop is `unsupported` (`query_kind`).
-        if self.try_move_blocks(&mut b, ATTACKER, DEFENDER, move_id)
-            || self.pre_hit(&mut b, ATTACKER, DEFENDER, move_id)? == Pre::Stops
-        {
+        let draws_before = b.rng_draws();
+        let try_move_blocks = self.try_move_blocks(&mut b, ATTACKER, DEFENDER, move_id);
+        // The event's handlers are sorted by speed: two equal speeds (two Damp holders of one set) draw.
+        let try_move_draws = b.rng_draws() != draws_before;
+        if try_move_blocks || self.pre_hit(&mut b, ATTACKER, DEFENDER, move_id)? == Pre::Stops {
             return Ok(Outcome::Unsupported {
                 reason: Reason::QueryKind,
                 position: None,
@@ -102,7 +104,8 @@ impl Prober {
         let kind = self.dex.move_kind[move_id as usize];
         // A target the move's own ModifyMove changes (Expanding Force in Psychic Terrain) is drawn again by the engine; so is
         // Fickle Beam's power. The reference records any draw other than the roll and the crit as a random effect.
-        let mut random_effect = kind == MoveKind::FickleBeam;
+        let mut random_effect = try_move_draws;
+        let fickle = kind == MoveKind::FickleBeam;
         let target_type = b
             .modify_move_target_type(ATTACKER, mdata, Some(DEFENDER))
             .unwrap_or_else(|| b.move_target_type(ATTACKER, mdata));
@@ -155,6 +158,8 @@ impl Prober {
             b.speed_sort_by(&mut speeds, |a, c| (*c as i64) - (*a as i64));
             random_effect |= b.rng_draws() != before;
         }
+        // Fickle Beam's power is drawn in the damage step, which an immune or protected defender never reaches.
+        random_effect |= fickle && !blocked;
         if random_effect {
             return Ok(Outcome::Unsupported {
                 reason: Reason::RandomEffect,
