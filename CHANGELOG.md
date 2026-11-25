@@ -2,6 +2,50 @@
 
 ## Unreleased
 
+Hardening after the review of the pin sync.
+
+### Changed
+
+- **`Dex::from_json` and `Dex.load` take only an export of the pinned Showdown commit.** An
+  export of another commit, or one that names none, is an error; `Dex::from_json_unpinned`
+  and `allow_unpinned=True` (Python) are the explicit override. A cached export that names no
+  commit is no longer taken by `ninjask.format.export_path` (it was, as "hand-made"): it is an
+  `ExportCommitError` unless `allow_unpinned` says otherwise, and the bundled copy and a freshly
+  made export are checked as well. The test fixtures and the tests that read hand-made exports
+  use the override.
+- **The `ninjask.extension` entry-point group is opt-in.** Any installed distribution could
+  declare it and replace the engine's classes in every program that imports `ninjask`; now the
+  process names the entry point in `NINJASK_EXTENSION`, and a declaration alone is ignored with
+  a warning. Projects that embed the engine set the variable (README, "Embedding in another
+  extension").
+- `refsim/PROVENANCE.json` is schema 2: it also records a hash of every Showdown source file the
+  engine comes from, each format's mod chain, and names the pin before this one (`3a766f2`).
+  `scripts/repin.py` classifies a Showdown path from those chains and a reviewed table (it
+  missed `data/mods/championsregmb/`, called `sim/battle-stream.ts` mechanics and
+  `sim/dex.ts` data, and called an unknown file `other`); a file it does not know is
+  `unreviewed`. It no longer imports the compiled package.
+- CI: no credentials in checkouts, no cache of the Showdown checkout (it is cloned and built on
+  every run, and `setup_showdown.sh` refuses a checkout that is not the pin), a push to `main`
+  is never cancelled.
+
+### Added
+
+- `ninjask.dex(id, data_dir=...)`, `ninjask.load(id, data_dir=...)` and `export_path(...,
+  data_dir=...)`: load a format from a directory of exports (the layout of `$NINJASK_DATA`) in
+  an installed wheel.
+- `refsim/source_files.js`, `scripts/repin.py diff-showdown --strict`, `--mod` and `--candidate`.
+
+### Fixed
+
+- Two Revival Blessing slots in one request may name the same fainted teammate (`switch 3,
+  switch 3`): Showdown never records a revival in `switchIns` and accepts it (checked at the pin,
+  all nine combinations of two revivals and a pass); the engine and `joint_choices` refused it.
+
+### Known limitations
+
+- A `trapped` volatile with a hidden trapper on a No Retreat user is projected into a world as
+  No Retreat's own trap (README, Known limitations).
+
 ## 0.4.1+areneon.0 (2026-11-25)
 
 The Areneon fork (https://github.com/piglor/ninjask) of upstream 0.4.1 (commit

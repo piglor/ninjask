@@ -37,13 +37,38 @@ Check the machine before building (a shared machine: `nice -n 19`, `-j4`, one te
 ## 2. Read the Showdown diff
 
 ```sh
-python scripts/repin.py diff-showdown $OLD NEW_COMMIT --showdown "$NINJASK_SHOWDOWN"
+python scripts/repin.py diff-showdown $OLD NEW_COMMIT --showdown "$NINJASK_SHOWDOWN" --candidate --strict
 ```
 
-lists every commit and the files it touches, sorted into **mechanics** (handler code: `data/mods/<mod>/`,
-`data/moves.ts`, `abilities.ts`, `items.ts`, `conditions.ts`, `scripts.ts`, `sim/battle*.ts`,
-`sim/pokemon.ts`, ...), **data** (rules, species, learnsets, validation: the exports carry them) and
-**other** (server, tests, text: no effect). It is a guide, not a verdict. Then:
+lists every commit and the files it touches, then every file whose content differs between the two
+commits, sorted into **mechanics** (handler code and type-chart rules the engine ports), **data**
+(rules, species, learnsets, validation: the exports carry them), **unreviewed** and **other** (server,
+tests, text: no effect). `--strict` exits 1 if a mechanics or unreviewed file differs, so the step is
+machine-checkable: it passes only when nothing the engine ports moved. A bump that moves a mechanics
+file reads that file's diff (below) and ports or confirms it; the step is done when every one is
+accounted for in the pull request. If `OLD` is the recorded pin, the command first checks the hash of
+every recorded source file against git at `OLD` (`provenance: ...` lines, exit 1): a record made from a
+tree that is not the pin's is caught before the diff is trusted.
+
+**How a path is classified** (`classify` in `scripts/repin.py`; nothing is a path prefix):
+
+- the set of mods that matter is derived: the inheritance chain of each bundled format, which
+  `refsim/source_files.js` reads from Showdown's own Dex (`parentMod`, from each mod's `inherit`) and
+  `refsim/PROVENANCE.json` records (`export.formats.<id>.mod_chain`), so `championsregmb` is found
+  because the Reg M-B format inherits `champions`, not because its name starts with that of another
+  mod; `--candidate` also reads the chains of the checkout at `NEW` (a new regulation's mod), `--mod
+  NAME` adds one by hand; a mod that no bundled format inherits is **other**;
+- every file of a chain mod and of the base data directory is classified by what it is: moves, abilities,
+  items, conditions, scripts and rulesets are **mechanics** (they hold handlers); learnsets, pokedex,
+  formats-data, natures, typechart, aliases, tags and pokemongo are **data**;
+- every `sim/*.ts` is in a reviewed table with its own entry (`SIM_CLASS`): the battle files, `dex.ts` and
+  `dex-data.ts` (type-chart rules, effect defaults) and `lib/utils.ts` (called by the battle code) are
+  **mechanics**; the species, formats, team validator and teams files are **data**; streams, text and
+  types are **other**;
+- anything else in those places (a new sim file, a new kind of mod file) is **unreviewed**: read it, then add
+  it to the table in the same pull request. It is never quietly **other**.
+
+It is a guide to where to read, and the table is reviewed code. Then:
 
 - read `git diff $OLD NEW_COMMIT -- PATH` for **every** mechanics path, including the ones that look like
   data (`data/items.ts`, `sim/dex-items.ts`: a Fling rule moved in one pin bump) and the shared sim files
@@ -95,8 +120,10 @@ mod's `scripts.ts`, `rulesets.ts`) is in the **mechanics** list of step 2 and no
 3. Delete `data/derived/format/` (a cached export of another commit is exported again, but be sure) and
    build the checkout at the new pin: `./scripts/setup_showdown.sh`.
 4. Port, one behaviour change per commit, each citing the Showdown function it follows.
-5. `python scripts/repin.py provenance write`, review the diff of `refsim/PROVENANCE.json` (the section
-   hashes that moved are the entities of step 3; the others did not), commit it with the pin.
+5. `python scripts/repin.py provenance write`, review the diff of `refsim/PROVENANCE.json` and commit it
+   with the pin: the section hashes that moved are the entities of step 3, the `showdown.sources` hashes
+   that moved are exactly the files `diff-showdown` listed in step 2 (a hash that moved for a file it did
+   not list is a problem), and `previous_pins` gains the pin this one replaces.
 
 ## 5. Check against Showdown
 
@@ -119,7 +146,7 @@ done; done
 python scripts/check_pairs.py --ids ID1,ID2,... --games-per-pair 12 --workers 4              # changed entities, and the ones they interact with
 python scripts/check_choices.py --games 300 --workers 4
 python scripts/check_tracker.py --games 100
-python scripts/repin.py provenance check
+python scripts/repin.py provenance check     # the exports, the export tool and every Showdown source file
 ```
 
 `check_pairs.py` hangs, with idle workers and no message, when `--ids` names an id the engine does not
@@ -156,6 +183,9 @@ RESULT.json`, read `summarize.py`. Zero unclassified differences; Team Preview's
 
 `.github/workflows/ci.yml` runs the checks of step 5 at a small size, and `fidelity` plays the
 reference comparisons at about 8,100 games (about 12 minutes). `parity-at-scale.yml` runs a million.
+Every job clones and builds Showdown at the pin (nothing cached from an earlier run: a cached checkout
+would be code executed on trust), its checkouts keep no credentials, and a push to `main` is never
+cancelled.
 After the pull request is merged to the fork's `main`, the Areneon repository bumps its `vendor/ninjask`
 submodule to that commit; its pin test requires `vendor/ninjask/refsim/SHOWDOWN_COMMIT` to equal its own
 `vendor/pokemon-showdown` gitlink and the compiled `ninjask.SHOWDOWN_COMMIT` to equal both.
@@ -169,6 +199,8 @@ submodule to that commit; its pin test requires `vendor/ninjask/refsim/SHOWDOWN_
   wrong commit said it was the right one. It now reads the checkout's commit and refuses a checkout that
   is not the pin, or has tracked files changed.
 - A cached export was used whatever commit it came from. `ninjask.format.export_path` and the Rust tests
-  now check it against the pin.
+  now check it against the pin; the loader itself (`Dex::from_json`, `Dex.load`) refuses an export of
+  another commit or one that names none (`allow_unpinned` / `Dex::from_json_unpinned` override it), so an
+  old export cannot be played under a new engine whatever called the loader.
 - Python (`ninjask.choices`) and Rust (`Battle::joint_choices`) enumerate choices by the same rule and
   must be changed together; the tests of both live in `test_choices.py` and `tests/pin_sync.rs`.
