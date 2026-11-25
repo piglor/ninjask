@@ -63,6 +63,7 @@ pub mod battle;
 pub mod boosts;
 pub mod calc;
 pub mod conditions;
+pub mod declared;
 pub mod dex;
 pub mod encode;
 pub mod events;
