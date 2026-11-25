@@ -8,6 +8,24 @@
 //! It is a pure function of the request JSON: it proposes every
 //! engine-distinct joint choice; only the engine decides which are legal.
 //!
+//! Ported from, and tested against (`tests/fixtures/areneon/SOURCE.json`,
+//! `tests/python/test_n1_source.py`):
+//!
+//! - Areneon commit `f8223adaf42fb78d4c35dfc0c3b8f37be0b4ccbb`:
+//!   `packages/showdown-bridge/src/choices.ts`, last changed in
+//!   `f4606f49914897daf5c40c011e2cef0fdd4005c4`, SHA-256
+//!   `f629cffdd8bb805f5fe0a42dd336d45d1240e2340f4b6fecb82dec943f3b753e`;
+//! - the request shape it reads, `packages/schema/contracts/v1/engine-request.schema.json`
+//!   (`REQUEST_KEYS` and the lists below are its keys), SHA-256
+//!   `ef69fb6c8b6d647ad71717f9d017918b6dea2057a369f4d981797fae0f332f56`;
+//! - the golden choice corpus `fixtures/showdown/gen9championsvgc2026regmc/choices/`
+//!   (17 cases), whose files are in `tests/fixtures/areneon/choices/`.
+//!
+//! When the reference changes the test that holds it equal to those hashes
+//! fails, and the 3,200-battle comparison of
+//! `docs/n1-seeds-channels-candidates.md` has to be run again before the
+//! header and the manifest are rewritten.
+//!
 //! Differences from [`Battle::legal_choices`](crate::Battle), which stays as
 //! it is: Team Preview lists every *ordered* pick (360 for four of six, not
 //! the 90 of unordered leads), the order of the list is the one below, and
