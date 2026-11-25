@@ -237,6 +237,10 @@ pub struct FormatInfo {
     pub level: Option<u8>,
     pub stat_point_limit: Option<u16>,
     pub champions: bool,
+    /// The lines Showdown writes around the start of a battle that the
+    /// engine's log does not carry (`crate::channel`); `None` in an export
+    /// made without them.
+    pub banner: Option<crate::channel::Banner>,
 }
 
 /// FxHash (as in rustc) for the dex's lookups by id, which run during
@@ -384,6 +388,10 @@ impl Dex {
             level: f["adjustLevel"].as_u64().map(|n| n as u8),
             stat_point_limit: f["evLimit"].as_u64().map(|n| n as u16),
             champions: s(f, "mod").starts_with("champions"),
+            banner: match &f["banner"] {
+                Value::Null => None,
+                b => Some(crate::channel::Banner::from_json(b)?),
+            },
         };
 
         // Types: every key of the type chart is a type; inner keys that are

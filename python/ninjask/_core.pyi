@@ -16,6 +16,12 @@ ACTION_WIDTH: int
 DEFAULT_MAX_PATHS: int
 """Chance paths `Battle.enumerate_outcomes` explores unless given `max_paths`."""
 
+Draw = tuple[str, list[str], list[str]]
+"""One call on the random source as Showdown's battle makes it: the method (`random`, `randomChance`, `sample`,
+`shuffle`), its arguments and its result, each number a decimal string (`randomChance`: `true` or `false`;
+`sample`: the number of items, then the index drawn; `shuffle`: the number of items and the range, then the
+permutation of the indices)."""
+
 @final
 class EnumerationMode:
     """How `Battle.enumerate_outcomes` treats damage rolls; other chance events are exhaustive."""
@@ -70,9 +76,31 @@ class Battle:
     """A battle between two packed teams. Sides are "p1" and "p2"; slots are
     named like "p1a"."""
 
-    def __new__(cls, dex: Dex, team1: str, team2: str, seed: int, names: tuple[str, str] | None = None) -> Battle: ...
+    def __new__(
+        cls,
+        dex: Dex,
+        team1: str,
+        team2: str,
+        seed: int,
+        names: tuple[str, str] | None = None,
+        channels: bool = False,
+        record_draws: bool = False,
+        forced_draws: list[Draw] | None = None,
+    ) -> Battle:
+        """`channels=True` keeps the stream Showdown sends each player (`channel`; needs a format
+        export with the banner); `record_draws=True` logs every random draw (`take_draws`);
+        `forced_draws` answers the draws made while the battle is built (see `set_forced_draws`)."""
     @staticmethod
-    def reference(dex: Dex, team1: str, team2: str, seed: str, names: tuple[str, str] | None = None) -> Battle:
+    def reference(
+        dex: Dex,
+        team1: str,
+        team2: str,
+        seed: str,
+        names: tuple[str, str] | None = None,
+        channels: bool = False,
+        record_draws: bool = False,
+        forced_draws: list[Draw] | None = None,
+    ) -> Battle:
         """Reference mode: Showdown's RNG, seeded like Showdown's ("sodium,<hex>")."""
     @staticmethod
     def from_projection(dex: Dex, projection: str, seed: int, names: tuple[str, str] | None = None) -> Battle:
@@ -89,6 +117,36 @@ class Battle:
         has chosen, until the turn runs (see `needs_choice`); a side with
         nothing to decide gets `{"wait": true, ...}`."""
     def needs_choice(self, side: str) -> bool: ...
+    def channel(self, viewer: str, start: int = 0) -> list[str]:
+        """Lines `start..` of a channel, `viewer` "p1" or "p2" (the stream Showdown sends that
+        player: the log as they see it, each `|request|` where Showdown sends it, a wait request for
+        the side with nothing to choose, `|error|` lines for refused choices, no `rqid`) or
+        "omniscient" (the log with both sides' secrets, no requests). Needs `channels=True`."""
+    def channel_len(self, viewer: str) -> int:
+        """The number of lines of a channel."""
+    def discard_channel(self, viewer: str, upto: int) -> None:
+        """Forget the lines of a channel before line `upto`, which the caller has taken (a channel keeps its
+        requests, most of its memory). Lines from `upto` on stay readable; asking for forgotten lines raises
+        ValueError."""
+    def request_hash(self, side: str) -> str | None:
+        """The identity of the side's current request: the SHA-256 (64 lower-case hex digits) of its
+        canonical JSON (RFC 8785) without `rqid`; None when it has no request."""
+    def candidates(self, side: str) -> list[tuple[str, bool]]:
+        """The choices the side may submit, `(choice, pending)`, from its request, in the order of
+        Areneon's reference enumerator: Team Preview lists every ordered pick (360 of four from
+        six, not the 90 of `legal_choices`); `pending` is true where the request cannot tell the
+        player whether the choice is legal, so the engine may refuse it. Empty for a side that only
+        waits. ValueError for a request with a field the enumerator does not know."""
+    def chosen(self, side: str) -> str | None:
+        """The choice the side has made and not yet had run, in the engine's own spelling."""
+    def take_draws(self) -> list[Draw]:
+        """The random draws made since the last call, `(method, args, result)` as Showdown's PRNG
+        calls (`random`, `randomChance`, `sample`, `shuffle`), each with the result used. Needs
+        `record_draws=True` or `set_forced_draws`."""
+    def set_forced_draws(self, draws: list[Draw]) -> None:
+        """Answer the next draws from a list: the n-th call made from now on takes the result of the
+        n-th entry when its method and arguments are the entry's, else the generator's own. Starts
+        the log. ValueError for a malformed entry of a known method."""
     def choose(self, side: str, choice: str) -> None:
         """Submit a choice; raises ValueError with Showdown's message if invalid.
 
@@ -198,17 +256,50 @@ class Batch:
     """Many battles stepped together, in parallel, with both players'
     trackers kept in Rust (`ninjask::batch`)."""
 
-    def __new__(cls, dex: Dex, n: int) -> Batch: ...
+    def __new__(
+        cls,
+        dex: Dex,
+        n: int,
+        names: tuple[str, str] | None = None,
+        channels: bool = False,
+        record_draws: bool = False,
+    ) -> Batch:
+        """`names`: the players' names (default `Player 1`, `Player 2`). `channels=True` keeps each
+        battle's channels (`channel`; needs a format export with the banner). `record_draws=True`
+        logs each battle's random draws (`take_draws`)."""
     def __len__(self) -> int: ...
     @property
     def turn_limit(self) -> int:
         """The turn after which a battle stops as a draw (default 150)."""
     @turn_limit.setter
     def turn_limit(self, turns: int) -> None: ...
-    def reset(self, i: int, team1: str, team2: str, seed: int) -> None:
-        """Start a battle in slot `i`."""
-    def reset_many(self, slots: list[int], teams1: list[str], teams2: list[str], seeds: list[int]) -> None:
+    def reset(self, i: int, team1: str, team2: str, seed: int | str, forced_draws: list[Draw] | None = None) -> None:
+        """Start a battle in slot `i`. `seed` is an integer (the fast generator) or a Showdown seed
+        `sodium,<hex>` (Showdown's own generator: the battle draws the numbers a Showdown battle with
+        that seed draws). `forced_draws` answers the draws made while the battle is built."""
+    def reset_many(self, slots: list[int], teams1: list[str], teams2: list[str], seeds: list[int | str]) -> None:
         """Start several battles, built in parallel."""
+    def pending(self) -> list[tuple[int, int]]:
+        """The pending decisions as `(battle, side)`, what `observe` reports without the observations."""
+    def choose(self, picks: list[tuple[int, int, str]]) -> bytes:
+        """Submit choices as text, `(battle, side, choice)`: uint8 per pick, bit 0 refused as
+        `[Unavailable choice]` (still pending, a new request), bit 1 the battle ended, bit 2 refused as
+        invalid. With channels the error and the new request are in the stream."""
+    def choose_candidates(self, picks: list[tuple[int, int, int]]) -> bytes:
+        """`choose`, each pick naming one of the side's candidates by its index in `candidates`."""
+    def candidates(self, i: int, side: int | str) -> list[tuple[str, bool]]:
+        """The candidates of the side's current request in battle `i` (see `Battle.candidates`)."""
+    def channel(self, i: int, viewer: str, start: int = 0) -> list[str]:
+        """Lines `start..` of a channel of battle `i` (see `Battle.channel`)."""
+    def channel_len(self, i: int, viewer: str) -> int: ...
+    def discard_channel(self, i: int, viewer: str, upto: int) -> None:
+        """Forget the lines of a channel of battle `i` before line `upto` (see `Battle.discard_channel`)."""
+    def request_hash(self, i: int, side: int | str) -> str | None:
+        """The identity of the side's current request in battle `i` (see `Battle.request_hash`)."""
+    def take_draws(self, i: int) -> list[Draw]:
+        """The draws battle `i` made since the last call (see `Battle.take_draws`)."""
+    def set_forced_draws(self, i: int, draws: list[Draw]) -> None:
+        """Force the next draws of battle `i` (see `Battle.set_forced_draws`)."""
     def observe(self) -> Observation:
         """Every pending decision of every running battle (see `Observation`)."""
     def step(self, choices: list[int]) -> bytes:
