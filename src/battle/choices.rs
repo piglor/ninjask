@@ -440,16 +440,13 @@ impl Battle {
                 return push(SlotChoice::Pass);
             }
             if side.revival[slot] {
-                // Revival Blessing: a fainted teammate, wherever it is.
-                let mut any = false;
+                // Revival Blessing: a fainted teammate, wherever it is; or
+                // a pass, which `JointRule` allows only for a Pokémon that
+                // has no living replacement (`forcedPassesLeft`).
                 for i in (0..side.mons.len()).filter(|&i| side.mons[i].fainted) {
-                    any = true;
                     push(SlotChoice::Switch { index: i });
                 }
-                if !any {
-                    push(SlotChoice::Pass);
-                }
-                return;
+                return push(SlotChoice::Pass);
             }
             for i in bench() {
                 push(SlotChoice::Switch { index: i });
@@ -603,7 +600,7 @@ impl Battle {
         let n = self.sides[s].n_active;
         let per_slot: Vec<Vec<SlotChoice>> =
             (0..n).map(|slot| self.slot_options(s, slot)).collect();
-        self.combine_slot_options(per_slot)
+        self.combine_slot_options(s, per_slot)
     }
 
     /// The joint choices a side's request offers its player, in
@@ -620,7 +617,7 @@ impl Battle {
         let per_slot: Vec<Vec<SlotChoice>> = (0..n)
             .map(|slot| self.player_slot_options(s, slot))
             .collect();
-        self.combine_slot_options(per_slot)
+        self.combine_slot_options(s, per_slot)
     }
 
     /// Every team-preview pick a side can make, as team positions (0-based)
@@ -665,12 +662,39 @@ impl Battle {
         });
     }
 
-    /// Joint choices from each slot's options: Showdown refuses two
-    /// switches to one Pokémon and two Mega Evolutions, and a forced switch
-    /// must fill as many slots as it can.
-    fn combine_slot_options(&self, per_slot: Vec<Vec<SlotChoice>>) -> Vec<Vec<SlotChoice>> {
+    /// What `Side.choose` and `Battle.choose` require of a joint choice for
+    /// side `s`'s current request, beyond each slot's own options.
+    fn joint_rule(&self, s: usize) -> JointRule {
+        let side = &self.sides[s];
+        let n = side.n_active;
+        let mut rule = JointRule::default();
+        if self.request != RequestState::Switch {
+            return rule;
+        }
+        // clearChoice: how many of the Pokémon that must switch can, and how
+        // many have no one to switch in for them.
+        let can_out = (0..n).filter(|&i| self.force_switch_flag(s, i)).count();
+        let can_in = (n..side.mons.len())
+            .filter(|&i| !side.mons[i].fainted)
+            .count();
+        rule.forced_switches = can_out.min(can_in);
+        rule.forced_passes = can_out - rule.forced_switches;
+        for slot in 0..n {
+            rule.must_switch[slot] = self.force_switch_flag(s, slot);
+            rule.reviving[slot] = side.revival[slot];
+        }
+        rule
+    }
+
+    /// Joint choices from each slot's options, the ones Showdown accepts
+    /// (see [`JointRule`]).
+    fn combine_slot_options(
+        &self,
+        s: usize,
+        per_slot: Vec<Vec<SlotChoice>>,
+    ) -> Vec<Vec<SlotChoice>> {
         let mut out = Vec::new();
-        self.for_each_combination(&per_slot, &mut |c| out.push(c.to_vec()));
+        self.for_each_combination(s, &per_slot, &mut |c| out.push(c.to_vec()));
         out
     }
 
@@ -686,36 +710,18 @@ impl Battle {
         let per_slot: ArrayVec<Vec<SlotChoice>, MAX_ACTIVE_PER_SIDE> = (0..n)
             .map(|slot| self.player_slot_options(s, slot))
             .collect();
-        self.for_each_combination(&per_slot, f);
+        self.for_each_combination(s, &per_slot, f);
     }
 
     /// The joint choices of each slot's options in product order, keeping
-    /// those Showdown accepts (no two switches to one Pokémon, at most one
-    /// Mega Evolution; a forced switch fills as many slots as it can).
+    /// those Showdown accepts (see [`JointRule`]).
     fn for_each_combination(
         &self,
+        s: usize,
         per_slot: &[Vec<SlotChoice>],
         f: &mut impl FnMut(&[SlotChoice]),
     ) {
         type Joint = ArrayVec<SlotChoice, MAX_ACTIVE_PER_SIDE>;
-        /// The number of switches of an acceptable joint choice.
-        fn switches(c: &[SlotChoice]) -> Option<usize> {
-            let mut to: ArrayVec<usize, MAX_ACTIVE_PER_SIDE> = ArrayVec::new();
-            let mut megas = 0;
-            for x in c {
-                match *x {
-                    SlotChoice::Switch { index } => {
-                        if to.contains(&index) {
-                            return None;
-                        }
-                        to.push(index);
-                    }
-                    SlotChoice::Move { mega: true, .. } => megas += 1,
-                    _ => {}
-                }
-            }
-            (megas <= 1).then_some(to.len())
-        }
         fn rec(per_slot: &[Vec<SlotChoice>], cur: &mut Joint, f: &mut dyn FnMut(&[SlotChoice])) {
             let Some((first, rest)) = per_slot.split_first() else {
                 return f(cur);
@@ -726,23 +732,11 @@ impl Battle {
                 cur.pop();
             }
         }
+        let rule = self.joint_rule(s);
         let mut cur = Joint::new();
-        let most = if self.request == RequestState::Switch {
-            let mut most = None;
-            rec(per_slot, &mut cur, &mut |c| {
-                if let Some(k) = switches(c) {
-                    most = Some(most.map_or(k, |m: usize| m.max(k)));
-                }
-            });
-            most
-        } else {
-            None
-        };
         rec(per_slot, &mut cur, &mut |c| {
-            if let Some(k) = switches(c) {
-                if most.is_none_or(|m| k == m) {
-                    f(c);
-                }
+            if rule.accepts(c) {
+                f(c);
             }
         });
     }
@@ -774,17 +768,7 @@ impl Battle {
                 &heap[slot]
             }
         };
-        let bench = (n..self.sides[s].mons.len())
-            .filter(|&i| !self.sides[s].mons[i].fainted)
-            .count();
-        let forced = (0..n)
-            .filter(|&slot| self.force_switch_flag(s, slot))
-            .count();
-        let want_switches = if self.request == RequestState::Switch {
-            forced.min(bench)
-        } else {
-            0
-        };
+        let rule = self.joint_rule(s);
         loop {
             let pick: ArrayVec<SlotChoice, MAX_ACTIVE_PER_SIDE> = (0..n)
                 .map(|slot| {
@@ -792,20 +776,7 @@ impl Battle {
                     o[rng.random(o.len() as u32) as usize]
                 })
                 .collect();
-            let mut switches: ArrayVec<usize, MAX_ACTIVE_PER_SIDE> = ArrayVec::new();
-            let mut megas = 0;
-            for c in &pick {
-                match *c {
-                    SlotChoice::Switch { index } => switches.push(index),
-                    SlotChoice::Move { mega: true, .. } => megas += 1,
-                    _ => {}
-                }
-            }
-            let distinct = switches
-                .iter()
-                .enumerate()
-                .all(|(i, x)| !switches[..i].contains(x));
-            if distinct && megas <= 1 && switches.len() >= want_switches {
+            if rule.accepts(&pick) {
                 return pick.to_vec();
             }
         }
@@ -876,3 +847,60 @@ fn for_each_subset(
 /// four moves at four targets with and without Mega Evolution, then six
 /// Pokémon and Struggle, fit.
 const SLOT_OPTIONS_INLINE: usize = 48;
+
+/// What `Side.choose` and `Battle.choose` require of a joint choice for a
+/// request, beyond each slot's own options: the slots are read in order, as
+/// Showdown reads the choice's parts.
+///
+/// - A switch request starts (`clearChoice`) with `forced_switches` =
+///   min(Pokémon that must switch, living Pokémon on the bench) and
+///   `forced_passes` = the rest. A Pokémon that must switch may pass only
+///   while a forced pass is left, and, once the forced switches are used, can
+///   switch to nothing more (Showdown throws there: such a choice can't be
+///   sent). The choice is complete when no forced switch is left.
+/// - Revival Blessing's `switch` to a fainted teammate counts as a forced
+///   switch (down to 0) and takes no living replacement, so the reviving
+///   Pokémon may also pass when nobody lives on the bench.
+/// - No two parts switch to one Pokémon, and at most one part Mega Evolves.
+#[derive(Default)]
+struct JointRule {
+    forced_switches: usize,
+    forced_passes: usize,
+    must_switch: [bool; MAX_ACTIVE_PER_SIDE],
+    reviving: [bool; MAX_ACTIVE_PER_SIDE],
+}
+
+impl JointRule {
+    fn accepts(&self, choice: &[SlotChoice]) -> bool {
+        let (mut switches_left, mut passes_left) = (self.forced_switches, self.forced_passes);
+        let mut to: ArrayVec<usize, MAX_ACTIVE_PER_SIDE> = ArrayVec::new();
+        let mut megas = 0;
+        for (slot, part) in choice.iter().enumerate() {
+            match *part {
+                SlotChoice::Pass if self.must_switch[slot] => {
+                    if passes_left == 0 {
+                        return false;
+                    }
+                    passes_left -= 1;
+                }
+                SlotChoice::Switch { index } => {
+                    if to.contains(&index) {
+                        return false;
+                    }
+                    to.push(index);
+                    if self.reviving[slot] {
+                        switches_left = switches_left.saturating_sub(1);
+                    } else if self.must_switch[slot] {
+                        if switches_left == 0 {
+                            return false;
+                        }
+                        switches_left -= 1;
+                    }
+                }
+                SlotChoice::Move { mega: true, .. } => megas += 1,
+                _ => {}
+            }
+        }
+        megas <= 1 && switches_left == 0
+    }
+}

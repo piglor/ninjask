@@ -87,6 +87,10 @@ pub(crate) enum HandlerKind {
     /// Future Sight's slot condition (onResidualOrder 3, subOrder 3), on the
     /// Pokémon in the slot.
     FutureMove(MonRef),
+    /// Revival Blessing's slot condition: a duration of 1, so it ends in the
+    /// turn's residual (no onResidual: order last, subOrder 3). A passed
+    /// revival ends here and its forced switch with it.
+    RevivalBlessing(MonRef),
     /// A volatile with a residual handler or a duration: Counter, Mirror
     /// Coat, Gem, Beak Blast, Focus Punch, Syrup Bomb, Endure, Ally Switch,
     /// Curse, locked moves, Electrify, Lock-On and Octolock.
@@ -420,7 +424,14 @@ impl Battle {
             .is_some()
             .then_some((HandlerKind::FutureMove(r), 3, 3));
         let wish = slot.wish.is_some().then_some((HandlerKind::Wish(r), 4, 3));
-        for (kind, order, sub_order) in [ability, item, future, wish].into_iter().flatten() {
+        let revival = self.sides[r.0]
+            .revival
+            .get(r.1)
+            .copied()
+            .unwrap_or(false)
+            .then_some((HandlerKind::RevivalBlessing(r), NO_ORDER, 3));
+        for (kind, order, sub_order) in [ability, item, future, wish, revival].into_iter().flatten()
+        {
             handlers.push(Handler {
                 kind,
                 order,
@@ -1040,6 +1051,16 @@ impl Battle {
                     return Some(true);
                 }
                 false
+            }
+            HandlerKind::RevivalBlessing(r) => {
+                // duration 1 runs out: the slot condition is removed, with
+                // nothing to say (`removeSlotCondition`), fainted holder or not.
+                let revival = self.sides[r.0].revival.get_mut(r.1)?;
+                if !*revival {
+                    return None;
+                }
+                *revival = false;
+                true
             }
             HandlerKind::ChillyReception(r) => {
                 let m = self.mon(r);

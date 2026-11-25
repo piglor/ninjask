@@ -95,9 +95,10 @@ def slot_options(
             return [SlotAction("pass")]
         if side[slot].get("reviving"):
             # Revival Blessing: pick a fainted teammate to revive, even one
-            # that fainted in its slot this turn.
+            # that fainted in its slot this turn, or pass (a forced pass, see
+            # below: only when nobody lives on the bench).
             fainted = [i + 1 for i, mon in enumerate(side) if _fainted(mon)]
-            return [SlotAction("switch", i) for i in fainted] or [SlotAction("pass")]
+            return [SlotAction("switch", i) for i in fainted] + [SlotAction("pass")]
         # "pass" is allowed only when there aren't enough replacements;
         # joint_choices enforces that.
         return [SlotAction("switch", i) for i in bench] + [SlotAction("pass")]
@@ -135,8 +136,8 @@ def joint_choices(
     """All legal joint choices for a move or switch request.
 
     Removes combinations that Showdown rejects: two slots switching to the
-    same Pokémon, two Mega Evolutions in one turn, and a forced switch that
-    passes while another slot could still switch in.
+    same Pokémon, two Mega Evolutions in one turn, and in a forced switch the
+    passes it does not allow (``_forced_choice_ok``).
 
     ``game_type`` is forwarded to `slot_options` (see there): pass
     ``"doubles"`` whenever the battle is a doubles battle, so an endgame
@@ -145,20 +146,51 @@ def joint_choices(
     n = len(request.get("active", [])) or len(request.get("forceSwitch", []))
     per_slot = [slot_options(request, s, include_ally_targets, game_type) for s in range(n)]
     force = request.get("forceSwitch")
-    combos = []
+    rule = _forced_rule(request) if force is not None else None
+    out = []
     for combo in itertools.product(*per_slot):
         switches = [a.index for a in combo if a.kind == "switch"]
         if len(switches) != len(set(switches)):
             continue
         if sum(a.mega for a in combo) > 1:
             continue
-        combos.append((len(switches), combo))
-    if force is not None and combos:
-        # Showdown requires filling as many forced slots as possible.
-        most = max(n for n, _ in combos)
-        combos = [(n, c) for n, c in combos if n == most]
-    out = [", ".join(str(a) for a in combo) for _, combo in combos]
+        if rule is not None and not _forced_choice_ok(combo, *rule):
+            continue
+        out.append(", ".join(str(a) for a in combo))
     return out
+
+
+def _forced_rule(request: dict) -> tuple[list[bool], list[bool], int, int]:
+    """What a forced-switch request leaves to choose (Showdown's `clearChoice`): the slots
+    that must switch, the ones reviving a teammate, the switches still to make and the passes
+    allowed: as many Pokémon must switch as there are living replacements on the bench, and
+    each one that has none may pass."""
+    side = request["side"]["pokemon"]
+    must = [bool(f) for f in request["forceSwitch"]]
+    reviving = [bool(side[i].get("reviving")) for i in range(len(must))]
+    bench = sum(1 for mon in side if not mon.get("active") and not _fainted(mon))
+    switches = min(sum(must), bench)
+    return must, reviving, switches, sum(must) - switches
+
+
+def _forced_choice_ok(combo, must: list[bool], reviving: list[bool], switches: int, passes: int) -> bool:
+    """Whether Showdown takes `combo` for a forced switch, reading its parts in order: a Pokémon
+    that must switch passes only while a pass is allowed and switches only while a switch is
+    still due (Showdown throws on one more); a revival counts as a switch, but takes no living
+    replacement; and the choice is complete when no switch is due."""
+    for slot, action in enumerate(combo):
+        if action.kind == "pass" and must[slot]:
+            if not passes:
+                return False
+            passes -= 1
+        elif action.kind == "switch":
+            if reviving[slot]:
+                switches = max(switches - 1, 0)
+            elif must[slot]:
+                if not switches:
+                    return False
+                switches -= 1
+    return switches == 0
 
 
 def team_preview_choices(request: dict) -> list[str]:
