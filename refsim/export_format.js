@@ -18,6 +18,7 @@ const path = require('path');
 const PS = require('./showdown_path').showdownPath();
 const { Dex, TeamValidator, toID } = require(path.join(PS, 'dist', 'sim'));
 const { Format } = require(path.join(PS, 'dist', 'sim', 'dex-formats'));
+const { exportBanner } = require('./export_banner');
 
 /**
  * The commit this export is from. The pin (refsim/SHOWDOWN_COMMIT) is the
@@ -278,6 +279,8 @@ const out = {
 		maxTeamSize: ruleTable.maxTeamSize,
 		minTeamSize: ruleTable.minTeamSize,
 		showdownCommit: sourceCommit(),
+		// The lines Showdown writes around the start of a battle (`ninjask::channel`).
+		banner: exportBanner(PS, format),
 	},
 	species,
 	learnsets,
