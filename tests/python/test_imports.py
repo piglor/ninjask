@@ -14,7 +14,8 @@ from pathlib import Path
 
 # tests/python/test_imports.py -> the checkout's root
 ROOT = Path(__file__).resolve().parents[2]
-ALLOWED = {"ninjask", "numpy", "scipy", "pytest"} | set(sys.stdlib_module_names)
+# `n1_fixtures` is the test helper next to the N1 tests (tests/python/n1_fixtures.py).
+ALLOWED = {"ninjask", "numpy", "scipy", "pytest", "n1_fixtures"} | set(sys.stdlib_module_names)
 
 
 def _imports(path: Path) -> list[str]:

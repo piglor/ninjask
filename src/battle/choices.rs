@@ -782,6 +782,23 @@ impl Battle {
         }
     }
 
+    /// The choice `s` has made and not yet had run, as Showdown syntax in
+    /// the engine's own spelling (the parse of whatever text was accepted:
+    /// two spellings of one action give one string); `None` when the side
+    /// has not chosen.
+    pub fn chosen_text(&self, s: usize) -> Option<String> {
+        if let Some(order) = &self.sides[s].team_preview_choice {
+            return Some(format!(
+                "team {}",
+                order
+                    .iter()
+                    .map(|p| (p + 1).to_string())
+                    .collect::<String>()
+            ));
+        }
+        self.sides[s].choice.as_ref().map(|c| self.choice_string(c))
+    }
+
     /// Showdown choice string for a structured joint choice.
     pub fn choice_string(&self, choice: &[SlotChoice]) -> String {
         choice

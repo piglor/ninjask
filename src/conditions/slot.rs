@@ -45,6 +45,19 @@ impl Battle {
     /// and item. Dark types are immune.
     pub(crate) fn future_move_end(&mut self, t: MonRef, src: MonRef) {
         if self.mon(t).fainted || t == src {
+            // The hint names the move and why nothing was hit.
+            let why = if self.mon(t).fainted {
+                "fainted"
+            } else {
+                "the user"
+            };
+            if let Some(id) = self.dex.ids.moves.future_sight {
+                let name = self.dex.mv(id).name.clone();
+                log_line!(
+                    self,
+                    "|-hint|{name} did not hit because the target is {why}."
+                );
+            }
             return;
         }
         let ti = self.ident(t);

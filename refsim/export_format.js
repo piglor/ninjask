@@ -18,6 +18,7 @@ const path = require('path');
 const { showdownPath, sourceCommit, resolveFormat } = require('./showdown_path');
 const PS = showdownPath();
 const { Dex, TeamValidator, toID } = require(path.join(PS, 'dist', 'sim'));
+const { exportBanner } = require('./export_banner');
 
 const formatId = process.argv[2];
 if (!formatId) {
@@ -222,6 +223,8 @@ const out = {
 		maxTeamSize: ruleTable.maxTeamSize,
 		minTeamSize: ruleTable.minTeamSize,
 		showdownCommit: sourceCommit(PS),
+		// The lines Showdown writes around the start of a battle (`ninjask::channel`).
+		banner: exportBanner(PS, format),
 	},
 	species,
 	learnsets,

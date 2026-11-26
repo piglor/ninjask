@@ -9,7 +9,16 @@ use crate::kinds::{AbilityKind, AbsorbEffect, EffectRef};
 impl Battle {
     /// Priority of an ability's switch-in (`onStart`) handler, if it has one.
     pub(crate) fn ability_switch_in_priority(&self, r: MonRef) -> Option<i32> {
-        match self.ability_kind(r) {
+        switch_in_priority_of_ability(self.ability_kind(r))
+    }
+}
+
+/// The priority the engine gives an ability it acts on at switch-in (`None` for one it does not):
+/// the sort takes its list and priorities from the dex (`Event::SwitchIn`), and a test holds this
+/// to it.
+pub(crate) fn switch_in_priority_of_ability(kind: AbilityKind) -> Option<i32> {
+    {
+        match kind {
             AbilityKind::Intimidate
             | AbilityKind::SetWeather(_)
             | AbilityKind::SetTerrain(_)
@@ -36,7 +45,9 @@ impl Battle {
             _ => None,
         }
     }
+}
 
+impl Battle {
     /// An ability's `onStart` (run as `onSwitchIn` in Gen 5+, and after Mega Evolution).
     pub(crate) fn run_start(&mut self, r: MonRef) {
         // singleEvent('Start') skips a suppressed ability (Gastro Acid).
@@ -349,5 +360,56 @@ impl Battle {
             .filter_map(|sl| self.active(r.0, sl))
             .filter(|&a| a != r && self.mon(a).hp > 0)
             .any(|a| matches!(self.ability_id(a), "plus" | "minus"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::dex::events::{Event, Role};
+    use crate::items::switch_in_priority_of_item;
+    use crate::Dex;
+
+    fn dex() -> Dex {
+        Dex::from_json(include_str!(
+            "../../tests/fixtures/areneon/dex-gen9championsvgc2026regmc-7244fe8e.json"
+        ))
+        .unwrap()
+    }
+
+    /// The sort of a switch-in takes the handlers and their priorities from the dex; the engine's own
+    /// table of what it acts on must name a handler there, at the same priority, for every ability
+    /// and item, so no effect the engine runs is missing from the list or sorted at another place.
+    #[test]
+    fn what_the_engine_acts_on_at_switch_in_is_in_the_dex_at_its_priority() {
+        let dex = dex();
+        let mut abilities = 0;
+        for (id, kind) in dex.ability_kind.iter().enumerate() {
+            if let Some(p) = switch_in_priority_of_ability(*kind) {
+                abilities += 1;
+                let name = &dex.ability(id as AbilityId).id;
+                assert_eq!(
+                    dex.ability_handlers[id].priority(Event::SwitchIn, Role::Own),
+                    Some(p),
+                    "ability {name}"
+                );
+            }
+        }
+        let mut items = 0;
+        for (id, kind) in dex.item_kind.iter().enumerate() {
+            if let Some(p) = switch_in_priority_of_item(*kind) {
+                items += 1;
+                let name = &dex.item(id as ItemId).id;
+                assert_eq!(
+                    dex.item_handlers[id].priority(Event::SwitchIn, Role::Own),
+                    Some(p),
+                    "item {name}"
+                );
+            }
+        }
+        assert!(
+            abilities > 20 && items >= 6,
+            "{abilities} abilities, {items} items"
+        );
     }
 }

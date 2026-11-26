@@ -1,11 +1,13 @@
-//! Behaviour fingerprint: `cargo run --release --example fingerprint -- <dex.json> <teams.txt> [games] [per-game-output]`.
+//! Behaviour fingerprint: `cargo run --release --example fingerprint -- <dex.json> <teams.txt> [games] [per-game-output] [--skip-sort-entries]`.
 //!
 //! Plays seeded random-policy games and hashes everything observable: the log
 //! for each viewer, every request, and every PRNG draw (value, range and the
 //! queue/speed-sort notes) with the call sites left out, so moving code does
 //! not change the result. Two builds that print the same numbers behave
 //! identically. The optional fourth argument writes one hash per game, to find
-//! the first game that differs.
+//! the first game that differs. `--skip-sort-entries` (anywhere after the dex) leaves the
+//! `# sort` trace entries out of the draws hash, so a change that only completes the sorted
+//! lists (no number drawn moves) can be told from one that moves a draw.
 
 use std::io::Write;
 use std::sync::Arc;
@@ -43,7 +45,9 @@ fn strip_site(line: &str) -> &str {
 }
 
 fn main() {
-    let args: Vec<String> = std::env::args().collect();
+    let mut args: Vec<String> = std::env::args().collect();
+    let skip_sort = args.iter().any(|a| a == "--skip-sort-entries");
+    args.retain(|a| a != "--skip-sort-entries");
     let dex = Arc::new(Dex::from_json(&std::fs::read_to_string(&args[1]).unwrap()).unwrap());
     let teams: Vec<String> = std::fs::read_to_string(&args[2])
         .unwrap()
@@ -107,6 +111,9 @@ fn main() {
         }
         game_logs.text(&format!("end {} {:?}", b.turn, b.winner_name()));
         for line in b.rng.trace.take().unwrap_or_default() {
+            if skip_sort && line.starts_with("# sort ") {
+                continue;
+            }
             game_draws.text(strip_site(&line));
             n_draws += 1;
         }

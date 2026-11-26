@@ -195,6 +195,21 @@ pub trait Handlers {
     }
 }
 
+/// A condition's handlers as the export lists them (`callbacks`, and its numeric fields).
+struct ConditionHandlers {
+    callbacks: Vec<String>,
+    nums: Vec<(String, f64)>,
+}
+
+impl Handlers for ConditionHandlers {
+    fn callbacks(&self) -> &[String] {
+        &self.callbacks
+    }
+    fn nums(&self) -> &[(String, f64)] {
+        &self.nums
+    }
+}
+
 impl Handlers for Move {
     fn callbacks(&self) -> &[String] {
         &self.callbacks
@@ -237,6 +252,10 @@ pub struct FormatInfo {
     pub level: Option<u8>,
     pub stat_point_limit: Option<u16>,
     pub champions: bool,
+    /// The lines Showdown writes around the start of a battle that the
+    /// engine's log does not carry (`crate::channel`); `None` in an export
+    /// made without them.
+    pub banner: Option<crate::channel::Banner>,
     /// The Showdown commit the export says it is from (`format.showdownCommit`); none for a
     /// hand-made export (a test fixture). Only [`Dex::from_json_unpinned`] loads such a dex.
     pub showdown_commit: Option<String>,
@@ -316,6 +335,9 @@ pub struct Dex {
     pub ids: KnownIds,
     /// Numeric fields of Showdown conditions (duration, residual orders...).
     conditions: IdMap<IdMap<f64>>,
+    /// Sorted-event handler priorities per condition id (status, volatile, side, weather, terrain
+    /// and pseudo-weather conditions of the export's `conditions`).
+    condition_handlers: IdMap<crate::dex::events::EventHandlers>,
     /// Per item, its `mega_stone` pairs as species: the species named as the
     /// base, and the Mega forme (`None` for a name not in the dex).
     mega_forms: Vec<Vec<(Option<SpeciesId>, Option<SpeciesId>)>>,
@@ -414,6 +436,10 @@ impl Dex {
             level: f["adjustLevel"].as_u64().map(|n| n as u8),
             stat_point_limit: f["evLimit"].as_u64().map(|n| n as u16),
             champions: s(f, "mod").starts_with("champions"),
+            banner: match &f["banner"] {
+                Value::Null => None,
+                b => Some(crate::channel::Banner::from_json(b)?),
+            },
             showdown_commit: f["showdownCommit"].as_str().map(str::to_string),
         };
 
@@ -709,7 +735,20 @@ impl Dex {
             .unwrap_or_default();
 
         let mut conditions = IdMap::default();
+        let mut condition_handlers = IdMap::default();
         for (id, c) in root["conditions"].as_object().into_iter().flatten() {
+            condition_handlers.insert(
+                id.clone(),
+                crate::dex::events::EventHandlers::new(&ConditionHandlers {
+                    callbacks: strings(&c["callbacks"]),
+                    nums: c
+                        .as_object()
+                        .into_iter()
+                        .flatten()
+                        .filter_map(|(k, v)| v.as_f64().map(|x| (k.clone(), x)))
+                        .collect(),
+                }),
+            );
             let nums: IdMap<f64> = c
                 .as_object()
                 .into_iter()
@@ -794,8 +833,14 @@ impl Dex {
                 })
             })
             .collect();
-        let ability_handlers = abilities.iter().map(EventHandlers::new).collect();
-        let item_handlers = items.iter().map(EventHandlers::new).collect();
+        let ability_handlers = abilities
+            .iter()
+            .map(EventHandlers::for_ability_or_item)
+            .collect();
+        let item_handlers = items
+            .iter()
+            .map(EventHandlers::for_ability_or_item)
+            .collect();
         let index = |names: Vec<String>| -> IdMap<u16> {
             names
                 .into_iter()
@@ -826,6 +871,7 @@ impl Dex {
             item_handlers,
             ids: KnownIds::default(),
             conditions,
+            condition_handlers,
             mega_forms: Vec::new(),
         };
         dex.ids = KnownIds::resolve(&dex);
@@ -850,6 +896,17 @@ impl Dex {
     /// A numeric field of a Showdown condition, such as "duration" or "onResidualOrder".
     pub fn cond_num(&self, id: &str, field: &str) -> Option<f64> {
         self.conditions.get(id).and_then(|c| c.get(field)).copied()
+    }
+
+    /// The priority of condition `id`'s `role` handler for `event`, if it has one (a status, a
+    /// volatile, a side or field condition, as the export's `conditions` names it).
+    pub fn condition_priority(
+        &self,
+        id: &str,
+        event: events::Event,
+        role: events::Role,
+    ) -> Option<i32> {
+        self.condition_handlers.get(id)?.priority(event, role)
     }
 
     pub fn species_id(&self, name: &str) -> Option<SpeciesId> {

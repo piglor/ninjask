@@ -2,8 +2,50 @@
 
 ## Unreleased
 
+Fork changes for a training harness (Areneon, ticket #1532): Showdown seeds in
+`Batch`, per-player channels, candidates and the draw log. See
+`docs/n1-seeds-channels-candidates.md`. Games play as before (the same draws
+in the same order for every seed); logs gain `|-hint|` lines Showdown
+prints (twelve of the seventeen places a Reg M-C battle can reach), so `examples/fingerprint` moves from `c826ee9bb327b2d8` to
+`91fb64fa6e58900a` (logs +116 hint lines; the numbers drawn are equal, the draws entry gains 651
+`sort` trace entries of the completed sorted lists).
+
+The entries on the loader, `NINJASK_EXTENSION`, `PROVENANCE.json` schema 2 and the Revival Blessing fix are N0's hardening after the review of the pin sync (PR #3), merged into this branch.
+
 ### Added
 
+- **Showdown seeds in `Batch`**: `reset` and `reset_many` take a `"sodium,<hex>"`
+  seed as well as an integer (`ninjask::rng::Seed`); `Batch(dex, n, names=...)`.
+- **Channels** (`ninjask::channel`): each viewer's stream as Showdown sends
+  it, byte-equal on the recorded corpus: the banner the format export now
+  carries (`format.banner`, from `refsim/export_banner.js`), `|request|` lines
+  with wait requests and without `rqid`, `|error|` lines and the request
+  again after a refusal that revealed something, the blank line before
+  `|win|` / `|tie`. `Batch(..., channels=True)`, `Battle(..., channels=True)`,
+  `channel(viewer, start)`, `channel_len`, `discard_channel`, `request_hash`
+  (`ninjask::identity`: SHA-256 of the canonical JSON of the request without `rqid`).
+- **Candidates** (`ninjask::candidates`): `Battle.candidates(side)` /
+  `Batch.candidates(i, side)`, a port of Areneon's reference enumerator
+  (360 ordered Team Preview picks, its order, `pending` flags), tied to its
+  source by `tests/fixtures/areneon/SOURCE.json`; `Batch.choose` (text),
+  `Batch.choose_candidates` (indices), `Batch.pending()`; `Battle.chosen(side)`.
+- **Draw log and forced draws** (`ninjask::rng`): `record_draws=True`,
+  `take_draws()`, `set_forced_draws()`, `reset(..., forced_draws=...)`: every
+  call of Showdown's PRNG (`random`, `randomChance`, `sample`, `shuffle`) with
+  its arguments and result, and a mode that answers calls from a list.
+- `Batch` builds the trackers `observe` reads when it is first called, so a
+  batch read through channels builds none.
+- `scripts/areneon/`: the recorder of Showdown battles, the comparisons with
+  Areneon's reference enumerator, the hand-built hint scenarios and the audits that
+  the evidence is made with (`scripts/areneon/README.md`); fixtures under
+  `tests/fixtures/areneon/`.
+
+- `ninjask.dex(id, data_dir=...)`, `ninjask.load(id, data_dir=...)` and `export_path(...,
+  data_dir=...)`: load a format from a directory of exports (the layout of `$NINJASK_DATA`) in
+  an installed wheel.
+- `refsim/source_files.js`, `scripts/repin.py diff-showdown --strict`, `--mod` and `--candidate`, and
+  `scripts/repin.py provenance check-data DIR` (a directory of exports made elsewhere, held to the
+  record without a Showdown).
 - **The declared-state layer (`ninjask::declared`, `ninjask-probe`, `ninjask.Prober`).** Answers Areneon's mechanics-probe
   queries (`damage`, `speed_order`, `stats`) over declared sets and an absolute declared state from the engine's calculators, byte-equal
   with the Showdown probe where it answers and an abstention naming the entity where it does not (docs/declared.md). Engine changes:
@@ -11,9 +53,37 @@
   `randomChance` pair, stage 4 `1/1`), and `probe_sorts`/`calc_draws` so a read-only calculation can report the tie draws its event
   sorts would make (off in play).
 
-Hardening after the review of the pin sync.
-
 ### Changed
+
+- Five sites that drew `random(n)` directly call the method Showdown calls
+  (`sample`, `randomChance`): the numbers drawn are unchanged.
+- The engine's log carries `|-hint|` lines it omitted (twelve of seventeen places), the places of an audit
+  of every hint call site of the pin (`docs/n1-seeds-channels-candidates.md`,
+  "Hint audit"): Skill Swap between allies, Future Sight that does not hit, Dark's
+  immunity to Prankster, Rising Voltage on a grounded target, Psychic Terrain not
+  protecting an airborne target, Fake Out and First Impression after the first turn
+  out (Copycat, Instruct), a `cantusetwice` move used again (Gigaton Hammer),
+  Future Sight from turn 253 and Wish on turn 256. The fingerprint's log hash changes.
+  The fingerprint's three parts on the 2,000 fixture games: the logs differ by 116 hint lines
+  (`9489572e7e8eb387` to `a601ff69e464a335`), the requests are equal (`905e08f88638ebee`), and the
+  draws entry moves because the extended lists below add 651 `# sort` trace entries (877,797 to 878,448 on the 2,000 fixture games); the numbers
+  drawn are equal: `examples/fingerprint -- ... --skip-sort-entries` prints the draws hash
+  `1269806311788d01` on `main` and on this branch (`tests/fingerprint_flag.rs`).
+- The sorted `ModifyMove` and `Update` handler lists include the handlers Showdown
+  collects and the engine ran elsewhere (the user's ability and item, its freeze), as
+  the engine's other sorted lists do; the numbers drawn are unchanged, the framing of
+  the shuffle (`shuffle(len, start, end)`) now equals Showdown's.
+- The format exports carry `format.banner` (the lines Showdown writes around the start of a
+  battle, from `refsim/export_banner.js`); `refsim/export_banner.js` is a tool file of
+  `scripts/repin.py` now and `refsim/PROVENANCE.json` was rewritten: only the `format` section of
+  each bundled format (its hash and its key count), the export's own hash and size and the hashes of
+  the tool files differ.
+- `Battle.reseed` replaces only the generator: the draw log and forced draws stay
+  (it used to drop them). Evaluation-only interfaces (`chosen`, `take_draws`,
+  `show_team_sheets`, the omniscient channel) are labelled as such.
+- **For embedders** that build a `PyBattle` themselves (the crate's `python` feature): it
+  has a private channel field now; construct it with `PyBattle::from(battle)`
+  instead of a struct literal.
 
 - **`Dex::from_json` and `Dex.load` take only an export of the pinned Showdown commit.** An
   export of another commit, or one that names none, is an error; `Dex::from_json_unpinned`
@@ -37,15 +107,6 @@ Hardening after the review of the pin sync.
   every run, and `setup_showdown.sh` refuses a checkout that is not the pin), a push to `main`
   is never cancelled.
 
-### Added
-
-- `ninjask.dex(id, data_dir=...)`, `ninjask.load(id, data_dir=...)` and `export_path(...,
-  data_dir=...)`: load a format from a directory of exports (the layout of `$NINJASK_DATA`) in
-  an installed wheel.
-- `refsim/source_files.js`, `scripts/repin.py diff-showdown --strict`, `--mod` and `--candidate`, and
-  `scripts/repin.py provenance check-data DIR` (a directory of exports made elsewhere, held to the
-  record without a Showdown).
-
 ### Fixed
 
 - Two Revival Blessing slots in one request may name the same fainted teammate (`switch 3,
@@ -57,10 +118,17 @@ Hardening after the review of the pin sync.
   `"type": "module"`, as the Areneon monorepo's does: `refsim/package.json` now says `commonjs` for the
   directory (found by building the vendored engine's data from the monorepo).
 
+### Known gaps
+
+No `|tie` is written at `Batch.turn_limit`; the framing of a shuffle at 27 sorted-list
+call sites no corpus battle reaches is unaudited; `docs/n1-seeds-channels-candidates.md`,
+"Known gaps".
+
 ### Known limitations
 
 - A `trapped` volatile with a hidden trapper on a No Retreat user is projected into a world as
   No Retreat's own trap (README, Known limitations).
+
 
 ## 0.4.1+areneon.0 (2026-11-25)
 

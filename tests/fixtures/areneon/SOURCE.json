@@ -1,0 +1,37 @@
+{
+ "areneon_commit": "f8223adaf42fb78d4c35dfc0c3b8f37be0b4ccbb",
+ "format": "gen9championsvgc2026regmc",
+ "choices_ts": {
+  "path": "packages/showdown-bridge/src/choices.ts",
+  "last_changed_in": "f4606f49914897daf5c40c011e2cef0fdd4005c4",
+  "sha256": "f629cffdd8bb805f5fe0a42dd336d45d1240e2340f4b6fecb82dec943f3b753e"
+ },
+ "engine_request_schema": {
+  "path": "packages/schema/contracts/v1/engine-request.schema.json",
+  "last_changed_in": "5b0a24484064cc0c5ea4408ce78c68fd04eb8e64",
+  "sha256": "ef69fb6c8b6d647ad71717f9d017918b6dea2057a369f4d981797fae0f332f56"
+ },
+ "golden_choices": {
+  "dir": "fixtures/showdown/gen9championsvgc2026regmc/choices",
+  "last_changed_in": "f4606f49914897daf5c40c011e2cef0fdd4005c4",
+  "files": {
+   "double-switch.json": "70a89d595194619453655cd55b12175bc711fdd03d49a3384bc37f8376dcb287",
+   "fainted-no-replacement.json": "c79a845a72d08b361f9ce5123ff6d9ca6b21b14cb47b0155a17ea31b274d7a85",
+   "force-switch-one.json": "f386583e17ce5722feac6236c09035a5616e673a4798b6e3aac571bb69bb9a75",
+   "force-switch-revival-many.json": "98ffe54930a3747d4e1d4f92c9d59d38040c59c3f62bb0576503ccdd64cb8e90",
+   "force-switch-revival.json": "7784eb8eee391a223262cde20db1169b332511e0ac0cd280f9802a91413c71f9",
+   "force-switch-short-bench.json": "4856f3abe14d4acf508af0355efc4fa7562649da6184f4e9f2337ccc988e90d6",
+   "force-switch-two.json": "289d5f2628e00def721ac7b7b2bfe9b64a08c205d5dea3e9fb6026bbf8ad5c24",
+   "locked-move.json": "81482b47c5fbe51d99712fbeaa246a483888a24ac74b3fae1f41e7f35e476876",
+   "maybe-disabled.json": "5fd06c8a0e599e92d799a51ce42d5c5f51fdb46187c20426c50dceee915822e0",
+   "maybe-trapped.json": "48fc153b8f22779c5ff82591207eacffb153dd747e1b6faf82078b3e2f63f109",
+   "mega-both.json": "1c3879fc72acedd8ba0045b1aedc7742359f7de4c2859acfea653a0ae9e7b67b",
+   "mega.json": "229a3cc7d2ca4d45ff2cb15ddc5e62ad6918c5e34f063774750e528fc9bd2475",
+   "preview.json": "57232082bca4cda52fe46fab8b74dea90f2c2bba9b0b735c155a470714515d07",
+   "targets-clefable-garchomp.json": "d20db63f648ba00fd8f7297fb6661cb13f7b0bac97b7ca7fe6b210556fe4605f",
+   "targets-medicham-chimecho.json": "758e48c9eeecdf1f6f807d96aaca3b8e3e3066b253c072cf833c023654d0e19e",
+   "targets-talonflame-arcanine.json": "27640b907286d0228a2588609e22b23701d09d69962e37761f22bb490389646e",
+   "trapped.json": "35f8a42e79516d7b2d9960d1540144f7160bc7e853442921714f6594b2f4f2ac"
+  }
+ }
+}

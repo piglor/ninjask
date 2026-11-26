@@ -1,0 +1,1126 @@
+{
+ "events": {
+  "AfterBoost": {
+   "abilities": {
+    "Foe": [
+     "opportunist"
+    ],
+    "Own": [
+     "rattled"
+    ]
+   },
+   "conditions": {},
+   "items": {},
+   "moves": {}
+  },
+  "AfterEachBoost": {
+   "abilities": {
+    "Own": [
+     "competitive",
+     "defiant"
+    ]
+   },
+   "conditions": {},
+   "items": {},
+   "moves": {}
+  },
+  "AfterFaint": {
+   "abilities": {
+    "Source": [
+     "battlebond",
+     "eelevate",
+     "moxie"
+    ]
+   },
+   "conditions": {},
+   "items": {},
+   "moves": {}
+  },
+  "BasePower": {
+   "abilities": {
+    "Ally": [
+     "steelyspirit"
+    ],
+    "Any": [
+     "fairyaura"
+    ],
+    "Own": [
+     "aerilate",
+     "analytic",
+     "dragonize",
+     "ironfist",
+     "megalauncher",
+     "pixilate",
+     "punkrock",
+     "reckless",
+     "refrigerate",
+     "rivalry",
+     "sandforce",
+     "sharpness",
+     "sheerforce",
+     "strongjaw",
+     "supremeoverlord",
+     "technician",
+     "toughclaws"
+    ],
+    "Source": [
+     "dryskin"
+    ]
+   },
+   "conditions": {
+    "Own": [
+     "charge",
+     "electricterrain",
+     "gem",
+     "grassyterrain",
+     "helpinghand",
+     "mistyterrain",
+     "psychicterrain",
+     "rolloutstorage"
+    ],
+    "Source": [
+     "bounce"
+    ]
+   },
+   "items": {
+    "Own": [
+     "blackbelt",
+     "blackglasses",
+     "charcoal",
+     "dragonfang",
+     "fairyfeather",
+     "hardstone",
+     "magnet",
+     "metalcoat",
+     "miracleseed",
+     "muscleband",
+     "mysticwater",
+     "nevermeltice",
+     "poisonbarb",
+     "sharpbeak",
+     "silkscarf",
+     "silverpowder",
+     "softsand",
+     "spelltag",
+     "twistedspoon",
+     "wiseglasses"
+    ]
+   },
+   "moves": {
+    "Own": [
+     "barbbarrage",
+     "charge",
+     "electricterrain",
+     "expandingforce",
+     "facade",
+     "ficklebeam",
+     "grassyterrain",
+     "gravapple",
+     "helpinghand",
+     "knockoff",
+     "lashout",
+     "mistyexplosion",
+     "mistyterrain",
+     "psychicterrain",
+     "solarbeam",
+     "solarblade",
+     "venoshock"
+    ],
+    "Source": [
+     "bounce"
+    ]
+   }
+  },
+  "BeforeMove": {
+   "abilities": {},
+   "conditions": {
+    "Foe": [
+     "imprison"
+    ],
+    "Own": [
+     "attract",
+     "chillyreception",
+     "choicelock",
+     "confusion",
+     "destinybond",
+     "disable",
+     "flinch",
+     "frz",
+     "glaiverush",
+     "gravity",
+     "mustrecharge",
+     "par",
+     "slp",
+     "taunt",
+     "throatchop"
+    ]
+   },
+   "items": {},
+   "moves": {
+    "Foe": [
+     "imprison"
+    ],
+    "Own": [
+     "attract",
+     "chillyreception",
+     "destinybond",
+     "disable",
+     "glaiverush",
+     "gravity",
+     "taunt",
+     "throatchop"
+    ]
+   }
+  },
+  "ChangeBoost": {
+   "abilities": {
+    "Own": [
+     "contrary",
+     "ripen",
+     "simple"
+    ]
+   },
+   "conditions": {},
+   "items": {},
+   "moves": {}
+  },
+  "Damage": {
+   "abilities": {
+    "Any": [
+     "damp"
+    ],
+    "Own": [
+     "berserk",
+     "disguise",
+     "gluttony",
+     "heatproof",
+     "iceface",
+     "magicguard",
+     "poisonheal",
+     "rockhead",
+     "sturdy"
+    ]
+   },
+   "conditions": {
+    "Own": [
+     "endure"
+    ]
+   },
+   "items": {
+    "Own": [
+     "focusband",
+     "focussash"
+    ]
+   },
+   "moves": {
+    "Own": [
+     "endure"
+    ]
+   }
+  },
+  "DisableMove": {
+   "abilities": {},
+   "conditions": {
+    "Foe": [
+     "imprison"
+    ],
+    "Own": [
+     "choicelock",
+     "disable",
+     "encore",
+     "gravity",
+     "taunt",
+     "throatchop",
+     "torment"
+    ]
+   },
+   "items": {},
+   "moves": {
+    "Foe": [
+     "imprison"
+    ],
+    "Own": [
+     "disable",
+     "encore",
+     "fakeout",
+     "firstimpression",
+     "gravity",
+     "taunt",
+     "throatchop",
+     "torment"
+    ]
+   }
+  },
+  "Immunity": {
+   "abilities": {
+    "Own": [
+     "icebody",
+     "magmaarmor",
+     "oblivious",
+     "overcoat",
+     "sandforce",
+     "sandrush",
+     "sandveil",
+     "snowcloak"
+    ]
+   },
+   "conditions": {
+    "Own": [
+     "desolateland",
+     "dig",
+     "dive",
+     "magnetrise",
+     "sunnyday"
+    ]
+   },
+   "items": {},
+   "moves": {
+    "Own": [
+     "dig",
+     "dive",
+     "magnetrise"
+    ]
+   }
+  },
+  "MaybeTrapPokemon": {
+   "abilities": {
+    "Foe": [
+     "shadowtag"
+    ],
+    "Own": [
+     "runaway"
+    ]
+   },
+   "conditions": {},
+   "items": {
+    "Own": [
+     "shedshell"
+    ]
+   },
+   "moves": {}
+  },
+  "ModifyAccuracy": {
+   "abilities": {
+    "Own": [
+     "sandveil",
+     "snowcloak",
+     "tangledfeet"
+    ],
+    "Source": [
+     "compoundeyes",
+     "hustle"
+    ]
+   },
+   "conditions": {
+    "Own": [
+     "gravity"
+    ]
+   },
+   "items": {
+    "Own": [
+     "brightpowder"
+    ],
+    "Source": [
+     "widelens",
+     "zoomlens"
+    ]
+   },
+   "moves": {
+    "Own": [
+     "gravity"
+    ]
+   }
+  },
+  "ModifyAtk": {
+   "abilities": {
+    "Own": [
+     "blaze",
+     "firemane",
+     "flashfire",
+     "guts",
+     "hugepower",
+     "hustle",
+     "overgrow",
+     "purepower",
+     "stakeout",
+     "swarm",
+     "torrent",
+     "waterbubble"
+    ],
+    "Source": [
+     "heatproof",
+     "purifyingsalt",
+     "thickfat",
+     "waterbubble"
+    ]
+   },
+   "conditions": {},
+   "items": {
+    "Own": [
+     "lightball"
+    ]
+   },
+   "moves": {}
+  },
+  "ModifyBoost": {
+   "abilities": {
+    "Any": [
+     "unaware"
+    ]
+   },
+   "conditions": {},
+   "items": {},
+   "moves": {}
+  },
+  "ModifyDamage": {
+   "abilities": {
+    "Any": [
+     "friendguard"
+    ],
+    "Own": [
+     "sniper"
+    ],
+    "Source": [
+     "auraguard",
+     "filter",
+     "fluffy",
+     "multiscale",
+     "punkrock",
+     "ripen",
+     "solidrock"
+    ]
+   },
+   "conditions": {
+    "Any": [
+     "auroraveil",
+     "lightscreen",
+     "reflect"
+    ],
+    "Source": [
+     "dig",
+     "dive",
+     "dynamax",
+     "fly",
+     "glaiverush",
+     "minimize"
+    ]
+   },
+   "items": {
+    "Own": [
+     "expertbelt",
+     "lifeorb",
+     "metronome"
+    ],
+    "Source": [
+     "babiriberry",
+     "chartiberry",
+     "chilanberry",
+     "chopleberry",
+     "cobaberry",
+     "colburberry",
+     "habanberry",
+     "kasibberry",
+     "kebiaberry",
+     "occaberry",
+     "passhoberry",
+     "payapaberry",
+     "rindoberry",
+     "roseliberry",
+     "shucaberry",
+     "tangaberry",
+     "wacanberry",
+     "yacheberry"
+    ]
+   },
+   "moves": {
+    "Any": [
+     "auroraveil",
+     "lightscreen",
+     "reflect"
+    ],
+    "Source": [
+     "dig",
+     "dive",
+     "fly",
+     "glaiverush",
+     "minimize"
+    ]
+   }
+  },
+  "ModifyDef": {
+   "abilities": {
+    "Own": [
+     "furcoat",
+     "grasspelt",
+     "marvelscale"
+    ]
+   },
+   "conditions": {
+    "Own": [
+     "snowscape"
+    ]
+   },
+   "items": {},
+   "moves": {}
+  },
+  "ModifyMove": {
+   "abilities": {
+    "Own": [
+     "battlebond",
+     "illuminate",
+     "infiltrator",
+     "keeneye",
+     "longreach",
+     "moldbreaker",
+     "scrappy",
+     "sheerforce",
+     "skilllink",
+     "stalwart",
+     "stancechange",
+     "stench"
+    ]
+   },
+   "conditions": {
+    "Own": [
+     "frz",
+     "gravity",
+     "throatchop",
+     "wonderroom"
+    ]
+   },
+   "items": {
+    "Own": [
+     "choicescarf",
+     "kingsrock"
+    ]
+   },
+   "moves": {
+    "Own": [
+     "beatup",
+     "blizzard",
+     "curse",
+     "expandingforce",
+     "gravity",
+     "growth",
+     "hurricane",
+     "shellsidearm",
+     "terrainpulse",
+     "throatchop",
+     "thunder",
+     "weatherball",
+     "wonderroom"
+    ]
+   }
+  },
+  "ModifySpA": {
+   "abilities": {
+    "Own": [
+     "blaze",
+     "firemane",
+     "flashfire",
+     "minus",
+     "overgrow",
+     "plus",
+     "solarpower",
+     "stakeout",
+     "swarm",
+     "torrent",
+     "waterbubble"
+    ],
+    "Source": [
+     "heatproof",
+     "purifyingsalt",
+     "thickfat",
+     "waterbubble"
+    ]
+   },
+   "conditions": {},
+   "items": {
+    "Own": [
+     "lightball"
+    ]
+   },
+   "moves": {}
+  },
+  "ModifySpD": {
+   "abilities": {},
+   "conditions": {
+    "Own": [
+     "sandstorm"
+    ]
+   },
+   "items": {},
+   "moves": {}
+  },
+  "ModifySpe": {
+   "abilities": {
+    "Own": [
+     "chlorophyll",
+     "quickfeet",
+     "sandrush",
+     "slushrush",
+     "surgesurfer",
+     "swiftswim",
+     "unburden"
+    ]
+   },
+   "conditions": {
+    "Own": [
+     "par",
+     "tailwind"
+    ]
+   },
+   "items": {
+    "Own": [
+     "choicescarf",
+     "ironball"
+    ]
+   },
+   "moves": {
+    "Own": [
+     "tailwind"
+    ]
+   }
+  },
+  "SetStatus": {
+   "abilities": {
+    "Ally": [
+     "flowerveil",
+     "sweetveil"
+    ],
+    "Own": [
+     "immunity",
+     "insomnia",
+     "leafguard",
+     "limber",
+     "purifyingsalt",
+     "shieldsdown",
+     "thermalexchange",
+     "vitalspirit",
+     "waterbubble"
+    ]
+   },
+   "conditions": {
+    "Any": [
+     "uproar"
+    ],
+    "Own": [
+     "electricterrain",
+     "mistyterrain",
+     "safeguard"
+    ]
+   },
+   "items": {},
+   "moves": {
+    "Any": [
+     "uproar"
+    ],
+    "Own": [
+     "electricterrain",
+     "mistyterrain",
+     "safeguard"
+    ]
+   }
+  },
+  "Start": {
+   "abilities": {
+    "Own": [
+     "anticipation",
+     "cloudnine",
+     "curiousmedicine",
+     "drizzle",
+     "drought",
+     "electricsurge",
+     "embodyaspectcornerstone",
+     "embodyaspecthearthflame",
+     "embodyaspectteal",
+     "embodyaspectwellspring",
+     "fairyaura",
+     "flashfire",
+     "forecast",
+     "forewarn",
+     "frisk",
+     "gluttony",
+     "grassysurge",
+     "hospitality",
+     "iceface",
+     "intimidate",
+     "klutz",
+     "mimicry",
+     "moldbreaker",
+     "pressure",
+     "psychicsurge",
+     "sandstream",
+     "screencleaner",
+     "shieldsdown",
+     "snowwarning",
+     "supersweetsyrup",
+     "supremeoverlord",
+     "trace",
+     "unnerve"
+    ]
+   },
+   "conditions": {
+    "Own": [
+     "allyswitch",
+     "aquaring",
+     "attract",
+     "banefulbunker",
+     "beakblast",
+     "brn",
+     "charge",
+     "choicelock",
+     "commanded",
+     "confusion",
+     "counter",
+     "curse",
+     "destinybond",
+     "disable",
+     "dragoncheer",
+     "dynamax",
+     "electrify",
+     "encore",
+     "endure",
+     "focusenergy",
+     "focuspunch",
+     "followme",
+     "frz",
+     "futuremove",
+     "gastroacid",
+     "glaiverush",
+     "healreplacement",
+     "helpinghand",
+     "imprison",
+     "ingrain",
+     "kingsshield",
+     "leechseed",
+     "lockedmove",
+     "magnetrise",
+     "mirrorcoat",
+     "mustrecharge",
+     "noretreat",
+     "octolock",
+     "par",
+     "partiallytrapped",
+     "powertrick",
+     "protect",
+     "psn",
+     "ragepowder",
+     "roost",
+     "saltcure",
+     "slp",
+     "smackdown",
+     "spikyshield",
+     "stall",
+     "stockpile",
+     "substitute",
+     "syrupbomb",
+     "taunt",
+     "throatchop",
+     "torment",
+     "tox",
+     "trapped",
+     "twoturnmove",
+     "uproar",
+     "wish",
+     "yawn"
+    ]
+   },
+   "items": {
+    "Own": [
+     "airballoon",
+     "choicescarf",
+     "electricseed",
+     "grassyseed",
+     "metronome",
+     "mistyseed",
+     "psychicseed",
+     "whiteherb"
+    ]
+   },
+   "moves": {
+    "Own": [
+     "allyswitch",
+     "aquaring",
+     "attract",
+     "banefulbunker",
+     "beakblast",
+     "charge",
+     "counter",
+     "curse",
+     "destinybond",
+     "disable",
+     "dragoncheer",
+     "electrify",
+     "encore",
+     "endure",
+     "focusenergy",
+     "focuspunch",
+     "followme",
+     "gastroacid",
+     "glaiverush",
+     "helpinghand",
+     "imprison",
+     "ingrain",
+     "kingsshield",
+     "leechseed",
+     "magnetrise",
+     "mirrorcoat",
+     "noretreat",
+     "octolock",
+     "powertrick",
+     "protect",
+     "ragepowder",
+     "roost",
+     "saltcure",
+     "smackdown",
+     "spikyshield",
+     "stockpile",
+     "substitute",
+     "syrupbomb",
+     "taunt",
+     "throatchop",
+     "torment",
+     "uproar",
+     "wish",
+     "yawn"
+    ]
+   }
+  },
+  "SwitchIn": {
+   "abilities": {
+    "Any": [
+     "opportunist"
+    ],
+    "Own": [
+     "cloudnine",
+     "imposter",
+     "zerotohero"
+    ]
+   },
+   "conditions": {
+    "Own": [
+     "healingwish",
+     "healreplacement",
+     "spikes",
+     "stealthrock",
+     "stickyweb",
+     "tox",
+     "toxicspikes"
+    ]
+   },
+   "items": {
+    "Any": [
+     "whiteherb"
+    ]
+   },
+   "moves": {
+    "Own": [
+     "healingwish",
+     "spikes",
+     "stealthrock",
+     "stickyweb",
+     "toxicspikes"
+    ]
+   }
+  },
+  "TrapPokemon": {
+   "abilities": {
+    "Foe": [
+     "shadowtag"
+    ],
+    "Own": [
+     "runaway"
+    ]
+   },
+   "conditions": {
+    "Own": [
+     "commanded",
+     "commanding",
+     "fairylock",
+     "ingrain",
+     "octolock",
+     "partiallytrapped",
+     "trapped"
+    ]
+   },
+   "items": {
+    "Own": [
+     "shedshell"
+    ]
+   },
+   "moves": {
+    "Own": [
+     "fairylock",
+     "ingrain",
+     "octolock"
+    ]
+   }
+  },
+  "TryAddVolatile": {
+   "abilities": {
+    "Ally": [
+     "aromaveil",
+     "flowerveil",
+     "sweetveil"
+    ],
+    "Own": [
+     "innerfocus",
+     "insomnia",
+     "leafguard",
+     "owntempo",
+     "purifyingsalt",
+     "shieldsdown",
+     "vitalspirit"
+    ]
+   },
+   "conditions": {
+    "Own": [
+     "dynamax",
+     "electricterrain",
+     "focuspunch",
+     "mistyterrain",
+     "safeguard"
+    ]
+   },
+   "items": {},
+   "moves": {
+    "Own": [
+     "electricterrain",
+     "focuspunch",
+     "mistyterrain",
+     "safeguard"
+    ]
+   }
+  },
+  "TryBoost": {
+   "abilities": {
+    "Ally": [
+     "flowerveil"
+    ],
+    "Own": [
+     "bigpecks",
+     "clearbody",
+     "guarddog",
+     "hypercutter",
+     "illuminate",
+     "innerfocus",
+     "keeneye",
+     "mirrorarmor",
+     "oblivious",
+     "owntempo",
+     "scrappy",
+     "whitesmoke"
+    ]
+   },
+   "conditions": {},
+   "items": {},
+   "moves": {}
+  },
+  "TryEatItem": {
+   "abilities": {
+    "Foe": [
+     "unnerve"
+    ],
+    "Own": [
+     "berserk",
+     "ripen"
+    ]
+   },
+   "conditions": {},
+   "items": {
+    "Own": [
+     "oranberry",
+     "sitrusberry"
+    ]
+   },
+   "moves": {}
+  },
+  "TryHeal": {
+   "abilities": {
+    "Own": [
+     "ripen"
+    ],
+    "Source": [
+     "liquidooze"
+    ]
+   },
+   "conditions": {},
+   "items": {
+    "Own": [
+     "bigroot"
+    ]
+   },
+   "moves": {}
+  },
+  "TryHit": {
+   "abilities": {
+    "Own": [
+     "bulletproof",
+     "dryskin",
+     "eartheater",
+     "flashfire",
+     "goodasgold",
+     "lightningrod",
+     "magicbounce",
+     "motordrive",
+     "oblivious",
+     "overcoat",
+     "sapsipper",
+     "soundproof",
+     "sturdy",
+     "telepathy",
+     "voltabsorb",
+     "waterabsorb"
+    ]
+   },
+   "conditions": {
+    "Own": [
+     "banefulbunker",
+     "kingsshield",
+     "protect",
+     "psychicterrain",
+     "quickguard",
+     "spikyshield",
+     "wideguard"
+    ]
+   },
+   "items": {},
+   "moves": {
+    "Own": [
+     "banefulbunker",
+     "brickbreak",
+     "clangoroussoul",
+     "curse",
+     "disable",
+     "electrify",
+     "entrainment",
+     "gastroacid",
+     "grassknot",
+     "healingwish",
+     "heatcrash",
+     "heavyslam",
+     "helpinghand",
+     "kingsshield",
+     "lockon",
+     "lowkick",
+     "pollenpuff",
+     "poltergeist",
+     "protect",
+     "psychicfangs",
+     "psychicterrain",
+     "quickguard",
+     "ragingbull",
+     "revivalblessing",
+     "roleplay",
+     "shedtail",
+     "simplebeam",
+     "spikyshield",
+     "substitute",
+     "uproar",
+     "wideguard",
+     "worryseed",
+     "yawn"
+    ]
+   }
+  },
+  "TryHitSide": {
+   "abilities": {
+    "Ally": [
+     "magicbounce",
+     "sapsipper",
+     "soundproof"
+    ]
+   },
+   "conditions": {},
+   "items": {},
+   "moves": {}
+  },
+  "TryMove": {
+   "abilities": {
+    "Any": [
+     "damp"
+    ],
+    "Foe": [
+     "armortail",
+     "queenlymajesty"
+    ]
+   },
+   "conditions": {
+    "Own": [
+     "desolateland",
+     "primordialsea"
+    ]
+   },
+   "items": {
+    "Own": [
+     "metronome"
+    ]
+   },
+   "moves": {
+    "Own": [
+     "bounce",
+     "burnup",
+     "dig",
+     "dive",
+     "doubleshock",
+     "electroshot",
+     "fly",
+     "meteorbeam",
+     "phantomforce",
+     "pollenpuff",
+     "skyattack",
+     "solarbeam",
+     "solarblade"
+    ]
+   }
+  },
+  "Update": {
+   "abilities": {
+    "Own": [
+     "disguise",
+     "iceface",
+     "immunity",
+     "insomnia",
+     "limber",
+     "magmaarmor",
+     "oblivious",
+     "owntempo",
+     "thermalexchange",
+     "trace",
+     "vitalspirit",
+     "waterbubble"
+    ]
+   },
+   "conditions": {
+    "Own": [
+     "attract",
+     "fling",
+     "syrupbomb"
+    ]
+   },
+   "items": {
+    "Own": [
+     "aspearberry",
+     "cheriberry",
+     "chestoberry",
+     "leppaberry",
+     "lumberry",
+     "mentalherb",
+     "oranberry",
+     "pechaberry",
+     "persimberry",
+     "rawstberry",
+     "sitrusberry"
+    ]
+   },
+   "moves": {
+    "Own": [
+     "attract",
+     "fling",
+     "syrupbomb"
+    ]
+   }
+  }
+ }
+}

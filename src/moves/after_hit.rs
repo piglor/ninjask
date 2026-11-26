@@ -120,6 +120,13 @@ impl Battle {
     pub(super) fn run_after_move_secondary(&mut self, src: MonRef, targets: &[MonRef], mv: &Move) {
         let mut handlers: Small<(MonRef, SecondaryHandler, i32, i32, i32)> = Small::new();
         for &t in targets {
+            // `findEventHandlers` collects a Pokémon's own handlers only while `target.isActive ||
+            // source.isActive`, and a fainted Pokémon stops being active in `faintMessages`, which
+            // the move's hit loop has run by now: when the user fainted too (Self-Destruct,
+            // Explosion), a target that fainted with it has none.
+            if self.mon(t).fainted && self.mon(src).fainted {
+                continue;
+            }
             let speed = self.mon(t).speed;
             if self.mon(t).status == Status::Frz {
                 handlers.push((t, SecondaryHandler::Thaw, 0, speed, 0));
@@ -780,14 +787,38 @@ impl Battle {
         {
             return false;
         }
-        if self.mon(healer).vol.heal_block > 0 {
+        {
+            // `runEvent('TryHeal', healer, source, ...)`: the healer's own handlers (Ripen's and Big
+            // Root's, from the dex), its Heal Block volatile (subOrder 2) and the source's
+            // `onSourceTryHeal` (Liquid Ooze) sort together; the first of the two that act stops it.
             use crate::abilities::{compare_mod, ModHandler};
-            let mut hs = [
-                (true, ModHandler::new(0, self.mon(healer).speed, 2)),
-                (false, ModHandler::new(0, self.mon(source).speed, 7)),
-            ];
-            self.speed_sort_by(&mut hs, |a, b| compare_mod(&a.1, &b.1));
-            if hs[0].0 {
+            use crate::dex::events::{Event, Role};
+            let ev = Event::TryHeal;
+            let (h, s) = (self.mon(healer), self.mon(source));
+            // 0: Heal Block, 1: Liquid Ooze, 2: a handler that acts elsewhere
+            let mut hs: Small<(u8, ModHandler)> = Small::new();
+            if let Some(p) = self.dex.ability_handlers[h.ability as usize].priority(ev, Role::Own) {
+                hs.push((2, ModHandler::new(p, h.speed, 7)));
+            }
+            if let Some(p) = h
+                .item
+                .and_then(|i| self.dex.item_handlers[i as usize].priority(ev, Role::Own))
+            {
+                hs.push((2, ModHandler::new(p, h.speed, 8)));
+            }
+            if h.vol.heal_block > 0 {
+                hs.push((0, ModHandler::new(0, h.speed, 2)));
+            }
+            if let Some(p) =
+                self.dex.ability_handlers[s.ability as usize].priority(ev, Role::Source)
+            {
+                hs.push((1, ModHandler::new(p, s.speed, 7)));
+            }
+            if hs.len() > 1 {
+                self.speed_sort_by(&mut hs, |a, b| compare_mod(&a.1, &b.1));
+            }
+            let first = hs.iter().map(|x| x.0).find(|&k| k < 2);
+            if first == Some(0) {
                 return false;
             }
         }

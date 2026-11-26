@@ -7,7 +7,7 @@ name: CI
 #      cargo test --release, after the format export, which the tests that
 #      play battles read (they skip without it), all with --locked;
 #   2. the behaviour fingerprint on the fixture teams (2000 games), which
-#      must print c826ee9bb327b2d8 (README, "Run the checks");
+#      must print 91fb64fa6e58900a (README, "Run the checks");
 #   3. the exports and the Showdown sources are what refsim/PROVENANCE.json says (the
 #      pin, the export tool, a hash of every bundled format, and of every Showdown
 #      source file those formats load and every sim/ file);
@@ -87,7 +87,7 @@ jobs:
       - name: Fingerprint (fixture teams, 2000 games)
         run: |
           cargo run --release --locked --example fingerprint -- data/derived/format/gen9championsvgc2026regmc.json tests/fixtures/regmc_teams.txt 2000 | tee fingerprint.txt
-          grep -qx "fingerprint c826ee9bb327b2d8" fingerprint.txt
+          grep -qx "fingerprint 91fb64fa6e58900a" fingerprint.txt
 
       - name: Exact agreement with Showdown (200 synthetic games)
         run: .venv/bin/python scripts/check_reference.py --synthetic --games 200 --workers 4

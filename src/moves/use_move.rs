@@ -6,7 +6,7 @@ use super::hit::TryHit;
 use crate::battle::log::LogEntry;
 use crate::battle::Small;
 use crate::battle::{ActiveList, Battle, MonRef};
-use crate::dex::events::Event;
+use crate::dex::events::{Event, Role};
 use crate::dex::types::*;
 use crate::dex::Move;
 use crate::kinds::AbilityKind;
@@ -215,6 +215,11 @@ impl Battle {
         if self.dex.move_kind[move_id as usize] != MoveKind::DestinyBond {
             self.mon_mut(r).vol.destiny_bond = false;
         }
+        // A `cantusetwice` move (Gigaton Hammer, Blood Moon) used right after
+        // itself: Showdown puts its id on the user as a volatile here, takes
+        // it off after AfterMove and hints if it was still there.
+        let again = self.mon(r).last_move == Some(move_id)
+            && self.dex.mv(move_id).has(MoveFlag::CantUseTwice);
         // beforeMoveCallback: Focus Punch after a hit.
         if self.focus_punch_before_move_callback(r, move_id) {
             self.active_move.cur_move = None;
@@ -257,9 +262,17 @@ impl Battle {
         let r = moved;
         // A called move (Copycat, Sleep Talk) is the active move from here
         // on, and its result is the Pokémon's.
-        let (move_id, result) = self.called_move_result(r, move_id, result);
+        let (called_id, result) = self.called_move_result(r, move_id, result);
         self.mon_mut(r).move_this_turn_result = result;
-        self.run_after_move(r, move_id, target);
+        self.run_after_move(r, called_id, target);
+        // The volatile is gone when the user was switched out in between (a
+        // Red Card), and it was never put on for a move another one called.
+        if again && called_id == move_id && self.mon(r).is_active {
+            let name = &self.dex.mv(move_id).name;
+            self.add(format!(
+                "|-hint|Some effects can force a Pokemon to use {name} again in a row."
+            ));
+        }
         self.faint_messages();
         self.check_win();
     }
@@ -270,50 +283,100 @@ impl Battle {
     /// happen: `Some(false)` a failure, `None` (recharging) not one.
     fn before_move(&mut self, r: MonRef, move_id: Option<MoveId>) -> Result<(), Option<bool>> {
         let ident = self.ident(r);
-        // runEvent sorts every handler before any runs, so ties draw first,
-        // highest priority first: Throat Chop and Heal Block (6), then the
-        // foes' Imprisons (4) at equal speed.
+        // `runEvent('BeforeMove')` sorts every handler before any runs, once: ties draw first,
+        // highest priority first (Chilly Reception and Glaive Rush 100, Throat Chop and Heal Block
+        // 6, the foes' Imprisons 4, at equal speed), and every handler present is in the list
+        // whether or not it acts: the user's status and volatiles, Gravity and the foes' Imprison,
+        // with their priorities from the dex.
         use crate::abilities::{compare_mod, ModHandler};
-        let mut six: Small<bool> = Small::new(); // true: Heal Block
-        if self.mon(r).vol.throat_chop > 0 {
-            six.push(false);
+        #[derive(Clone, Copy, PartialEq)]
+        enum B {
+            HealBlock,
+            ThroatChop,
+            Imprison(MonRef),
+            Other,
         }
-        if self.mon(r).vol.heal_block > 0 {
-            six.push(true);
+        let mut handlers: Small<(B, ModHandler)> = Small::new();
+        {
+            let (m, speed) = (self.mon(r), self.mon(r).speed);
+            let status = match m.status {
+                Status::Slp => "slp",
+                Status::Frz => "frz",
+                Status::Par => "par",
+                _ => "",
+            };
+            let own = [
+                (status, !status.is_empty(), 0, B::Other),
+                ("mustrecharge", m.vol.must_recharge > 0, 2, B::Other),
+                ("flinch", m.vol.flinch, 2, B::Other),
+                ("disable", m.vol.disable.is_some(), 2, B::Other),
+                ("throatchop", m.vol.throat_chop > 0, 2, B::ThroatChop),
+                ("taunt", m.vol.taunt > 0, 2, B::Other),
+                ("confusion", m.vol.confusion > 0, 2, B::Other),
+                ("attract", m.vol.attract.is_some(), 2, B::Other),
+                ("choicelock", m.vol.choice_lock.is_some(), 2, B::Other),
+                ("destinybond", m.vol.destiny_bond, 2, B::Other),
+                ("glaiverush", m.vol.glaive_rush, 2, B::Other),
+                ("chillyreception", m.vol.chilly_reception, 2, B::Other),
+            ];
+            for (id, on, sub, tag) in own {
+                if on {
+                    if let Some(p) = self
+                        .dex
+                        .condition_priority(id, Event::BeforeMove, Role::Own)
+                    {
+                        handlers.push((tag, ModHandler::new(p, speed, sub)));
+                    }
+                }
+            }
+            // Heal Block is not in the export (no Heal Block move in the format): priority 6.
+            if m.vol.heal_block > 0 {
+                handlers.push((B::HealBlock, ModHandler::new(6, speed, 2)));
+            }
+            // Gravity, a pseudo-weather: no speed, subOrder 5.
+            if self.field.gravity > 0 {
+                if let Some(p) =
+                    self.dex
+                        .condition_priority("gravity", Event::BeforeMove, Role::Own)
+                {
+                    handlers.push((B::Other, ModHandler::new(p, 0, 5)));
+                }
+            }
+            for f in self.foes_of(r) {
+                if self.mon(f).vol.imprison {
+                    if let Some(p) =
+                        self.dex
+                            .condition_priority("imprison", Event::BeforeMove, Role::Foe)
+                    {
+                        handlers.push((B::Imprison(f), ModHandler::new(p, self.mon(f).speed, 2)));
+                    }
+                }
+            }
         }
-        if six.len() > 1 {
-            let speed = self.mon(r).speed;
-            let mut hs: Small<(bool, ModHandler)> = six
-                .iter()
-                .map(|&k| (k, ModHandler::new(6, speed, 2)))
-                .collect();
-            self.speed_sort_by(&mut hs, |a, b| compare_mod(&a.1, &b.1));
-            six = hs.into_iter().map(|(k, _)| k).collect();
+        if handlers.len() > 1 {
+            self.speed_sort_by(&mut handlers, |a, b| compare_mod(&a.1, &b.1));
         }
-        let mut imprisoners: Small<(MonRef, ModHandler)> = self
-            .foes_of(r)
-            .into_iter()
-            .filter(|&f| self.mon(f).vol.imprison)
-            .map(|f| (f, ModHandler::new(4, self.mon(f).speed, 2)))
+        let six: Small<bool> = handlers
+            .iter()
+            .filter_map(|(b, _)| match b {
+                B::HealBlock => Some(true),
+                B::ThroatChop => Some(false),
+                _ => None,
+            })
             .collect();
-        if imprisoners.len() > 1 {
-            self.speed_sort_by(&mut imprisoners, |a, b| compare_mod(&a.1, &b.1));
-        }
+        let imprisoners: Small<(MonRef, ModHandler)> = handlers
+            .iter()
+            .filter_map(|&(b, h)| match b {
+                B::Imprison(f) => Some((f, h)),
+                _ => None,
+            })
+            .collect();
         // Chilly Reception's onBeforeMove (priority 100): `-prepare` before
-        // any other check, with Glaive Rush's drawback ending before the
-        // user's next move at the same priority.
+        // any other check; with Glaive Rush's drawback ending before the
+        // user's next move at the same priority (their tie is in the sort above).
         let chilly =
             move_id.is_some_and(|id| self.dex.move_kind[id as usize] == MoveKind::ChillyReception);
         if self.mon(r).vol.chilly_reception && chilly {
-            if self.mon(r).vol.glaive_rush {
-                // Both handlers tie on priority, speed and subOrder.
-                let speed = self.mon(r).speed;
-                let mut hs = [
-                    ModHandler::new(100, speed, 2),
-                    ModHandler::new(100, speed, 2),
-                ];
-                self.speed_sort_by(&mut hs, compare_mod);
-            }
             let ri = self.ident(r);
             log_line!(self, "|-prepare|{ri}|Chilly Reception|[premajor]");
         }
@@ -716,6 +779,30 @@ impl Battle {
                 ));
                 self.field.wonder_room_armed = true;
             }
+            // The user's ability and item, and its freeze, have a ModifyMove
+            // handler too (the engine runs them where it needs them). Their
+            // subOrders (7, 8, 0) are none of the others', so they tie with
+            // nothing, but they are in Showdown's list and so in the `len` of
+            // the shuffle that breaks a tie between the others.
+            if let Some(p) = self.dex.ability_handlers[self.mon(r).ability as usize]
+                .priority(Event::ModifyMove, Role::Own)
+            {
+                hs.push(ModHandler::new(
+                    p,
+                    speed,
+                    crate::abilities::SUB_ORDER_ABILITY,
+                ));
+            }
+            if let Some(item) = self.mon(r).item.filter(|_| !self.mon(r).revived) {
+                if let Some(p) =
+                    self.dex.item_handlers[item as usize].priority(Event::ModifyMove, Role::Own)
+                {
+                    hs.push(ModHandler::new(p, speed, crate::abilities::SUB_ORDER_ITEM));
+                }
+            }
+            if self.mon(r).status == Status::Frz {
+                hs.push(ModHandler::new(0, speed, 0));
+            }
             if hs.len() > 1 {
                 self.speed_sort_by(&mut hs, compare_mod);
             }
@@ -952,7 +1039,18 @@ impl Battle {
                 self.shell_side_arm_on_prepare_hit(r, targets.first().copied(), mv, line);
                 true
             }
-            MoveKind::FakeOut | MoveKind::FirstImpression => self.mon(r).active_move_actions <= 1,
+            // onTry: only on the first turn out (the move's own onTry hints why
+            // it fails; Copycat and Instruct are how a second use is reached).
+            MoveKind::FakeOut | MoveKind::FirstImpression => {
+                let first = self.mon(r).active_move_actions <= 1;
+                if !first {
+                    self.add(format!(
+                        "|-hint|{} only works on your first turn out.",
+                        mv.name
+                    ));
+                }
+                first
+            }
             // Sucker Punch also fails against a target that must recharge,
             // even when Encore changed its queued action.
             MoveKind::SuckerPunch => {
@@ -1086,6 +1184,9 @@ impl Battle {
                     MagicBounce,
                     SapSipper,
                     Soundproof,
+                    /// An ability with an `onTryHit` handler the engine acts on elsewhere, or not at all
+                    /// for a move aimed at a side: it is in Showdown's sort all the same.
+                    Inert,
                 }
                 let side = if mv.target == Target::FoeSide {
                     1 - r.0
@@ -1096,16 +1197,24 @@ impl Battle {
                     .filter_map(|sl| self.active(side, sl))
                     .filter(|&h| self.mon(h).hp > 0 && !self.mon(h).fainted)
                     .filter_map(|h| {
+                        // From the dex: every ability with an `onAllyTryHitSide` handler (Magic
+                        // Bounce, Sap Sipper, Soundproof), none of which sets a priority.
+                        let priority = self.dex.ability_handlers[self.mon(h).ability as usize]
+                            .priority(Event::TryHitSide, Role::Ally)?;
                         let k = match self.dex.ability(self.mon(h).ability).id.as_str() {
                             "magicbounce" => A::MagicBounce,
                             "sapsipper" => A::SapSipper,
                             "soundproof" => A::Soundproof,
-                            _ => return None,
+                            _ => A::Inert,
                         };
                         Some((
                             h,
                             k,
-                            ModHandler::new(0, self.mon(h).stats[Stat::Spe as usize] as i32, 7),
+                            ModHandler::new(
+                                priority,
+                                self.mon(h).stats[Stat::Spe as usize] as i32,
+                                7,
+                            ),
                         ))
                     })
                     .collect();
@@ -1322,7 +1431,20 @@ impl Battle {
                 };
                 let powder = mv.has(MoveFlag::Powder) && t != r && immune_to(self, "powder");
                 let dark = prankster && t.0 != r.0 && immune_to(self, "prankster");
-                if powder || self.run_try_immunity(t, r, mv) || dark {
+                let other = powder || self.run_try_immunity(t, r, mv);
+                if other || dark {
+                    // `hitStepTryImmunity`'s natural Prankster immunity says why, unless the
+                    // target would be immune to the move's own status anyway (an Illusion
+                    // hides that, so it says it then).
+                    if !other
+                        && (self.mon(t).illusion.is_some()
+                            || !mv.status.is_some_and(|s| immune_to(self, s.id())))
+                    {
+                        log_line!(
+                            self,
+                            "|-hint|Since gen 7, Dark is immune to Prankster moves."
+                        );
+                    }
                     let ti = self.ident(t);
                     log_line!(self, "|-immune|{ti}");
                     failed = true;
@@ -1504,7 +1626,13 @@ impl Battle {
             let last_target = last;
             let hp_before = self.mon(r).hp;
             self.run_after_move_secondary_self(r, last_target, kind);
-            if !self.magician_on_after_move_secondary_self(r, &live, mv) {
+            // Magician sorts `move.hitTargets`: every Pokémon the move hit, one that fainted of it
+            // included.
+            let hit_targets: Vec<MonRef> = match &self.active_move.hit_targets {
+                Some(t) => t.iter().copied().collect(),
+                None => live.to_vec(),
+            };
+            if !self.magician_on_after_move_secondary_self(r, &hit_targets, mv) {
                 self.after_move_secondary_self(r, last_target, mv, total_damage);
             }
             // EmergencyExit for a user that Life Orb took to half HP or less.

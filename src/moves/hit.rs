@@ -109,11 +109,20 @@ impl Battle {
             && self.move_priority(src, mv) > 0
             && mv.target != Target::SelfTarget
             && t.0 != src.0
-            && self.is_grounded(t)
         {
-            let ti = self.ident(t);
-            log_line!(self, "|-activate|{ti}|move: Psychic Terrain");
-            return TryHit::Failed;
+            if self.is_grounded(t) {
+                let ti = self.ident(t);
+                log_line!(self, "|-activate|{ti}|move: Psychic Terrain");
+                return TryHit::Failed;
+            }
+            // An airborne target is not protected, which the terrain says
+            // when the move is a priority move by its own data.
+            if mv.priority > 0 && !self.semi_invulnerable(t) {
+                log_line!(
+                    self,
+                    "|-hint|Psychic Terrain doesn't affect airborne Pokémon."
+                );
+            }
         }
         TryHit::Hit
     }
@@ -669,22 +678,9 @@ impl Battle {
                 let sub = subbed.contains(&t);
                 // ModifySecondaries (Shield Dust) filters before any roll; a
                 // substitute made the target null, so its handlers don't run.
-                // Its sort: the target's Shield Dust and the user's Parental
-                // Bond (`onSourceModifySecondaries`), equal ones drawn.
-                if !sub && (!mv.secondaries.is_empty() || kings_rock) {
-                    use crate::abilities::{compare_mod, ModHandler};
-                    let mut hs: Small<ModHandler> = Small::new();
-                    if self.raw_ability_kind(t) == AbilityKind::ShieldDust {
-                        hs.push(ModHandler::new(0, self.mon(t).speed, 7));
-                    }
-                    if self.raw_ability_kind(r) == AbilityKind::ParentalBond {
-                        hs.push(ModHandler::new(0, self.mon(r).speed, 7));
-                    }
-                    if hs.len() > 1 {
-                        self.speed_sort_by(&mut hs, compare_mod);
-                    }
-                }
-                let shielded = !sub && self.shield_dust_on_modify_secondaries(t);
+                let shielded = !sub
+                    && (!mv.secondaries.is_empty() || kings_rock)
+                    && self.modify_secondaries(r, t);
                 // The move's own secondaries come first; Stench appends its
                 // flinch, which the move's own handlers (Syrup Bomb's...)
                 // don't touch.
@@ -968,6 +964,13 @@ impl Battle {
                     ending_turn,
                     source: r,
                 });
+                // The turn count is an 8-bit one since Gen 8: a hit due on
+                // turn 255 or later never comes (`futuremove`'s onStart).
+                if ending_turn >= 254 {
+                    self.add(
+                        "|-hint|In Gen 8+, Future attacks will never resolve when used on the 255th turn or later.",
+                    );
+                }
                 log_line!(self, "|-start|{ri}|move: Future Sight");
                 // NOT_FAIL: the move counts as done.
                 Some(Some(true))
@@ -1248,5 +1251,24 @@ impl Battle {
     /// `self` part, before any chance roll.
     pub(crate) fn shield_dust_on_modify_secondaries(&self, t: MonRef) -> bool {
         self.has_ability(t, AbilityKind::ShieldDust)
+    }
+
+    /// `runEvent('ModifySecondaries', target, source, ...)` for a move with secondaries: the
+    /// target's Shield Dust and the user's Parental Bond (`onSourceModifySecondaries`) sort
+    /// together, equal ones drawn; the result is whether the target's Shield Dust drops every
+    /// secondary that is not on the user.
+    pub(crate) fn modify_secondaries(&mut self, r: MonRef, t: MonRef) -> bool {
+        use crate::abilities::{compare_mod, ModHandler};
+        let mut hs: Small<ModHandler> = Small::new();
+        if self.raw_ability_kind(t) == AbilityKind::ShieldDust {
+            hs.push(ModHandler::new(0, self.mon(t).speed, 7));
+        }
+        if self.raw_ability_kind(r) == AbilityKind::ParentalBond {
+            hs.push(ModHandler::new(0, self.mon(r).speed, 7));
+        }
+        if hs.len() > 1 {
+            self.speed_sort_by(&mut hs, compare_mod);
+        }
+        self.shield_dust_on_modify_secondaries(t)
     }
 }

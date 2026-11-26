@@ -26,7 +26,7 @@ impl Battle {
         if self.mon(r).fainted {
             return;
         }
-        let mut tags: Small<ModHandler> = self
+        let tags: Small<ModHandler> = self
             .foes_of(r)
             .into_iter()
             .filter(|&f| self.has_ability(f, AbilityKind::ShadowTag))
@@ -50,6 +50,21 @@ impl Battle {
         // Fairy Lock, a pseudo-weather: no speed, subOrder 2.
         if self.field.fairy_lock > 0 {
             all.push(ModHandler::new(0, 0, 2));
+        }
+        // Shed Shell's and Run Away's `onTrapPokemon` (priority -10, from the dex) are in the list:
+        // they sort after everything and tie with nothing, but count in the shuffle's `len`.
+        let ev = crate::dex::events::Event::TrapPokemon;
+        let role = crate::dex::events::Role::Own;
+        if let Some(p) = self.dex.ability_handlers[self.mon(r).ability as usize].priority(ev, role)
+        {
+            all.push(ModHandler::new(p, self.mon(r).speed, 7));
+        }
+        if let Some(p) = self
+            .mon(r)
+            .item
+            .and_then(|i| self.dex.item_handlers[i as usize].priority(ev, role))
+        {
+            all.push(ModHandler::new(p, self.mon(r).speed, 8));
         }
         if draw && all.len() > 1 {
             self.speed_sort_by(&mut all, compare_mod);
@@ -96,8 +111,24 @@ impl Battle {
         }
         // MaybeTrapPokemon runs when the types are unknown, or not immune.
         if !immune || self.mon(r).vol.type_unknown {
-            if draw && tags.len() > 1 {
-                self.speed_sort_by(&mut tags, compare_mod);
+            // `MaybeTrapPokemon`: the same two (the list holds the foes' Shadow Tags and these).
+            let ev = crate::dex::events::Event::MaybeTrapPokemon;
+            let role = crate::dex::events::Role::Own;
+            let mut maybe = tags.clone();
+            if let Some(p) =
+                self.dex.ability_handlers[self.mon(r).ability as usize].priority(ev, role)
+            {
+                maybe.push(ModHandler::new(p, self.mon(r).speed, 7));
+            }
+            if let Some(p) = self
+                .mon(r)
+                .item
+                .and_then(|i| self.dex.item_handlers[i as usize].priority(ev, role))
+            {
+                maybe.push(ModHandler::new(p, self.mon(r).speed, 8));
+            }
+            if draw && maybe.len() > 1 {
+                self.speed_sort_by(&mut maybe, compare_mod);
             }
             if !tags.is_empty() && !own_tag {
                 self.mon_mut(r).maybe_trapped = true;

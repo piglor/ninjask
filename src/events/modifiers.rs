@@ -485,6 +485,18 @@ impl Battle {
     /// `getStat('spe')` runs ModifyBoost then ModifySpe, on the user, then
     /// on the target.
     pub(crate) fn base_power_callback_events(&mut self, src: MonRef, tgt: MonRef, kind: MoveKind) {
+        // Rising Voltage's callback doubles the power on a grounded target in
+        // Electric Terrain, and says so when the target is not an ally.
+        if kind == MoveKind::RisingVoltage
+            && self.field.terrain == Some(Terrain::Electric)
+            && self.is_grounded(tgt)
+            && src.0 != tgt.0
+        {
+            log_line!(
+                self,
+                "|-hint|Rising Voltage's BP doubled on grounded target."
+            );
+        }
         if matches!(kind, MoveKind::ElectroBall | MoveKind::GyroBall) {
             for r in [src, tgt] {
                 self.event_sort(Event::ModifyBoost, r, None, &[]);
@@ -666,14 +678,5 @@ impl Battle {
             }
             _ => None,
         }
-    }
-
-    /// Whether the target's ability has an `onSourceModifyDamage` handler
-    /// among the handlers here (it joins the ModifyDamage sort).
-    pub(crate) fn has_source_modify_damage(&self, tgt: MonRef) -> bool {
-        matches!(
-            self.raw_ability_kind(tgt),
-            AbilityKind::PunkRock | AbilityKind::Fluffy
-        )
     }
 }

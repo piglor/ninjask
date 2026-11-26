@@ -415,6 +415,10 @@ impl Battle {
         let (si, ti) = (self.ident(src), self.ident(t));
         if src.0 == t.0 {
             log_line!(self, "|-activate|{si}|Skill Swap|||[of] {ti}");
+            log_line!(
+                self,
+                "|-hint|Skill Swap does not announce the abilities of the Pokémon when used between allies."
+            );
         } else {
             let (sn, tn) = (
                 self.dex.ability(sa).name.clone(),
@@ -645,7 +649,17 @@ impl Battle {
                     source_slot: r.1,
                     wisher: m.name.to_string(),
                 };
+                let starting_turn = wish.starting_turn;
                 self.slot_conds[t.0][t.1].wish = Some(wish);
+                // `Wish`'s onStart: with the 8-bit turn count (Gen 8+) a Wish
+                // made on the 256th turn counts as made on the 255th and
+                // never comes.
+                if starting_turn == 255 {
+                    let turn = self.turn;
+                    self.add(format!(
+                        "|-hint|In Gen 8+, Wish will never resolve when used on the {turn}th turn."
+                    ));
+                }
                 true
             }
             MoveKind::HealingWish => {
@@ -808,16 +822,17 @@ impl Battle {
                 }
                 if self.heal(t, amount, "") == 0 {
                     self.note_not_fail(t);
-                } else if (self.kings_rock_flinch(r, mv)
+                } else if self.kings_rock_flinch(r, mv)
                     || mv
                         .secondaries
                         .iter()
-                        .any(|s| s.volatile.as_deref() == Some("flinch")))
-                    && self.rng.random(100) < 10
+                        .any(|s| s.volatile.as_deref() == Some("flinch"))
                 {
-                    // King's Rock's or Stench's secondary rolls for a target
-                    // that was healed.
-                    self.add_volatile(t, "flinch", false);
+                    // King's Rock's or Stench's secondary rolls for a target that was healed,
+                    // unless ModifySecondaries (Shield Dust on the target) dropped it first.
+                    if !self.modify_secondaries(r, t) && self.rng.random(100) < 10 {
+                        self.add_volatile(t, "flinch", false);
+                    }
                 }
                 true
             }

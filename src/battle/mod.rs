@@ -851,7 +851,11 @@ impl Battle {
                 // which is its slot; switch whatever occupies that slot.
                 let slot = mon;
                 let m = &self.sides[side].mons[target];
-                if (!m.is_active || m.revived) && !m.fainted {
+                if m.is_active && !m.revived {
+                    // Showdown's `switchIn`: a Pokémon that is in already (an earlier switch of
+                    // the same phase brought it in) fails with a hint and changes nothing.
+                    self.add("|-hint|A switch failed because the Pokémon trying to switch in is already in.");
+                } else if !m.fainted {
                     self.switch_in(side, target, slot, false, from);
                 }
             }
@@ -1073,7 +1077,7 @@ impl Battle {
     /// `runEvent('DisableMove', pokemon)` at the end of the turn. The
     /// engine works out disabled moves when asked (`move_disabled`), but the
     /// handlers still sort: the Pokémon's volatiles (Choice lock, Disable,
-    /// Encore, Taunt, Throat Chop, Heal Block, Torment) and its foes' Imprison. Equal
+    /// Encore, Taunt, Throat Chop, Heal Block, Torment), its foes' Imprison and Gravity. Equal
     /// ones draw.
     fn disable_move_event(&mut self, r: MonRef) {
         use crate::abilities::{compare_mod, ModHandler};
@@ -1099,6 +1103,11 @@ impl Battle {
             if self.mon(f).vol.imprison {
                 keys.push(ModHandler::new(0, self.mon(f).speed, 2));
             }
+        }
+        // Gravity's `onDisableMove` (a pseudo-weather: no speed, subOrder 5) is in the list too; it
+        // ties with nothing here but is part of the `len` of the shuffle between the others.
+        if self.field.gravity > 0 {
+            keys.push(ModHandler::new(0, 0, 5));
         }
         if keys.len() > 1 {
             self.speed_sort_by(&mut keys, compare_mod);

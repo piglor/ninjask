@@ -21,6 +21,9 @@ enum SwitchInHandler {
     Hazard(crate::state::AHazard),
     /// Opportunist's `onAnySwitchIn` (priority -3).
     Opportunist,
+    /// A handler of the dex the engine has no effect for (Choice Scarf's `onStart`, an ability
+    /// that acts elsewhere): it sorts, and counts, and does nothing.
+    Inert,
 }
 
 impl Battle {
@@ -96,27 +99,79 @@ impl Battle {
             for (h, added) in self.entry_hazards(r) {
                 handlers.push((r, SwitchInHandler::Hazard(h), 0, key, 4, added));
             }
-            if let Some(priority) = self.ability_switch_in_priority(r) {
-                handlers.push((r, SwitchInHandler::Ability, priority, key, 7, 0));
+            // Every ability and item with a SwitchIn handler in the dex is in Showdown's list (an
+            // ability's or item's `onStart` is its handler too: `getCallback`), at the priority of
+            // its `onSwitchInPriority`, and counts in the length of the shuffle between the others
+            // whether or not the engine acts on it; the ones it does act on carry their effect.
+            let m = self.mon(r);
+            if let Some(priority) = self.dex.ability_handlers[m.ability as usize].priority(
+                crate::dex::events::Event::SwitchIn,
+                crate::dex::events::Role::Own,
+            ) {
+                let acts = self.ability_switch_in_priority(r).is_some();
+                let kind = if acts {
+                    SwitchInHandler::Ability
+                } else {
+                    SwitchInHandler::Inert
+                };
+                handlers.push((r, kind, priority, key, 7, 0));
             }
-            if let Some(priority) = self.item_switch_in_priority(r) {
-                if let Some(item) = self.mon(r).item {
-                    handlers.push((r, SwitchInHandler::Item(item), priority, key, 8, 0));
+            if let Some(item) = m.item {
+                if let Some(priority) = self.dex.item_handlers[item as usize].priority(
+                    crate::dex::events::Event::SwitchIn,
+                    crate::dex::events::Role::Own,
+                ) {
+                    let kind = if self.item_switch_in_priority(r).is_some() {
+                        SwitchInHandler::Item(item)
+                    } else {
+                        SwitchInHandler::Inert
+                    };
+                    handlers.push((r, kind, priority, key, 8, 0));
+                }
+            }
+            // The badly poisoned status has an `onSwitchIn` (it resets the stage): a status is
+            // subOrder 0.
+            if self.mon(r).status == Status::Tox {
+                if let Some(priority) = self.dex.condition_priority(
+                    "tox",
+                    crate::dex::events::Event::SwitchIn,
+                    crate::dex::events::Role::Own,
+                ) {
+                    handlers.push((r, SwitchInHandler::Inert, priority, key, 0, 0));
                 }
             }
             if self.slot_reacts_to_switch_in(r) {
                 handlers.push((r, SwitchInHandler::HealingWish, 0, key, 3, 0));
             }
         }
-        // White Herb's onAnySwitchIn (priority -2) on every active holder.
+        // `onAnySwitchIn` handlers of every active Pokémon's ability and item (White Herb, priority
+        // -2; Opportunist, -3), from the dex.
         for &r in &all {
-            if self.item_kind(r) == Some(ItemKind::WhiteHerb) {
-                let key = self.mon(r).speed as i64 * 4 - rank(r);
-                handlers.push((r, SwitchInHandler::WhiteHerb, -2, key, 8, 0));
+            let key = self.mon(r).speed as i64 * 4 - rank(r);
+            let m = self.mon(r);
+            if let Some(item) = m.item {
+                if let Some(priority) = self.dex.item_handlers[item as usize].priority(
+                    crate::dex::events::Event::SwitchIn,
+                    crate::dex::events::Role::Any,
+                ) {
+                    let kind = if self.item_kind(r) == Some(ItemKind::WhiteHerb) {
+                        SwitchInHandler::WhiteHerb
+                    } else {
+                        SwitchInHandler::Inert
+                    };
+                    handlers.push((r, kind, priority, key, 8, 0));
+                }
             }
-            if self.raw_ability_kind(r) == AbilityKind::Opportunist {
-                let key = self.mon(r).speed as i64 * 4 - rank(r);
-                handlers.push((r, SwitchInHandler::Opportunist, -3, key, 7, 0));
+            if let Some(priority) = self.dex.ability_handlers[m.ability as usize].priority(
+                crate::dex::events::Event::SwitchIn,
+                crate::dex::events::Role::Any,
+            ) {
+                let kind = if self.raw_ability_kind(r) == AbilityKind::Opportunist {
+                    SwitchInHandler::Opportunist
+                } else {
+                    SwitchInHandler::Inert
+                };
+                handlers.push((r, kind, priority, key, 7, 0));
             }
         }
         self.turn_state.sorting = false;
@@ -163,6 +218,7 @@ impl Battle {
                 SwitchInHandler::StealthRock => self.stealth_rock_switch_in(r),
                 SwitchInHandler::HealingWish => self.healing_wish_on_switch_in(r),
                 SwitchInHandler::Hazard(h) => self.hazard_on_switch_in(r, h),
+                SwitchInHandler::Inert => {}
             }
             self.faint_messages();
             if self.ended {
@@ -181,7 +237,7 @@ impl Battle {
         if bench.is_empty() || self.mon((s, slot)).hp == 0 {
             return;
         }
-        let pick = bench[self.rng.random(bench.len() as u32) as usize];
+        let pick = self.rng.sample(&bench);
         // dragIn runs DragOut again: an ability gained since the flag was
         // set (Guard Dog through Wandering Spirit) still holds it.
         if self.drag_out_blocked((s, slot)) {
@@ -686,6 +742,15 @@ impl Battle {
                 }
                 _ => {}
             }
+            // The Pokémon a queued switch or revival names (a revival of a fainted Pokémon in
+            // one of the two slots) moved with them.
+            if let ActionKind::Switch { side, target, .. }
+            | ActionKind::Revive { side, target, .. } = &mut a.kind
+            {
+                if *side == s {
+                    *target = flip(*target);
+                }
+            }
         }
         // runEvent('Swap') on the Pokémon now in the old slot, then on the
         // mover: a Healing Wish waiting in either slot heals it.
@@ -766,6 +831,21 @@ impl Battle {
                 .map(|(ts, ti)| if ts == s { (ts, flip(ti)) } else { (ts, ti) });
         self.follow_swap_field_refs(fix);
         self.follow_swap_volatile_refs(fix);
+        // A queued action holds the Pokémon it was chosen for (Showdown's `action.target` is the
+        // object), here an index into the side's order, which this swap changed: a switch to the
+        // Pokémon that just came in from the bench must still name it (and fail, the Pokémon being
+        // in already), not the one that went to the bench in its place.
+        for a in self.queue.iter_mut() {
+            match &mut a.kind {
+                ActionKind::Switch { side, target, .. }
+                | ActionKind::Revive { side, target, .. }
+                    if *side == s =>
+                {
+                    *target = flip(*target);
+                }
+                _ => {}
+            }
+        }
         for side in self.sides.iter_mut() {
             for m in side.mons.iter_mut() {
                 m.vol.lock_on = m

@@ -18,8 +18,70 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
 use crate::battle::Battle;
+use crate::channel::Channel;
 use crate::dex::support;
 use crate::dex::Dex;
+use crate::rng::{Draw, Rng, Seed};
+
+/// A draw as the differential harness writes it: method, arguments, result.
+type PyDraw = (String, Vec<String>, Vec<String>);
+
+fn draws_in(list: Vec<PyDraw>) -> Vec<Draw> {
+    list.into_iter()
+        .map(|(method, args, result)| Draw {
+            method,
+            args,
+            result,
+        })
+        .collect()
+}
+
+fn draws_out(list: Vec<Draw>) -> Vec<PyDraw> {
+    list.into_iter()
+        .map(|d| (d.method, d.args, d.result))
+        .collect()
+}
+
+/// A seed: an integer (fast generator) or a Showdown seed, `sodium,<hex>`.
+fn seed_of(obj: &Bound<'_, PyAny>) -> PyResult<Seed> {
+    if obj.is_instance_of::<pyo3::types::PyString>() {
+        return Ok(Seed::Showdown(obj.extract::<String>()?));
+    }
+    Ok(Seed::Fast(obj.extract::<u64>()?))
+}
+
+/// A channel's viewer: `p1`, `p2` or `omniscient`.
+fn viewer_index(viewer: &str) -> PyResult<usize> {
+    crate::channel::VIEWERS
+        .iter()
+        .position(|v| *v == viewer)
+        .ok_or_else(|| {
+            PyValueError::new_err(format!("unknown viewer {viewer}: p1, p2 or omniscient"))
+        })
+}
+
+/// A side given as its name (`p1`, `p2`) or its index (0, 1), as the
+/// `who` of `Batch.observe` has it.
+fn side_of(obj: &Bound<'_, PyAny>) -> PyResult<usize> {
+    if obj.is_instance_of::<pyo3::types::PyString>() {
+        return side_index(&obj.extract::<String>()?);
+    }
+    match obj.extract::<usize>()? {
+        s @ 0..=1 => Ok(s),
+        s => Err(PyValueError::new_err(format!("no side {s}: 0 or 1"))),
+    }
+}
+
+/// The bits `Batch.choose` reports per pick.
+fn chosen_bits((how, ended): (crate::batch::Chosen, bool)) -> u8 {
+    use crate::batch::Chosen;
+    let how = match how {
+        Chosen::Accepted => 0,
+        Chosen::Refused => 1,
+        Chosen::Invalid => 4,
+    };
+    how | (ended as u8) << 1
+}
 
 /// "team 1234" for team positions (0-based) in the order sent.
 fn team_string(order: &[usize]) -> String {
@@ -89,9 +151,7 @@ impl PyOutcome {
     }
     #[getter]
     fn battle(&self) -> PyBattle {
-        PyBattle {
-            inner: self.inner.battle.clone(),
-        }
+        PyBattle::from(self.inner.battle.clone())
     }
 }
 
@@ -244,41 +304,126 @@ impl PyDex {
 #[pyclass(name = "Battle", module = "ninjask")]
 pub struct PyBattle {
     pub inner: Battle,
+    /// The battle's channels, when it was made with them.
+    pub(crate) channel: Option<Channel>,
+}
+
+impl From<Battle> for PyBattle {
+    fn from(inner: Battle) -> PyBattle {
+        PyBattle {
+            inner,
+            channel: None,
+        }
+    }
+}
+
+impl PyBattle {
+    /// A battle from a generator: logging its draws, forced and with
+    /// channels as asked.
+    fn build(
+        dex: &PyDex,
+        teams: [&str; 2],
+        names: Option<(String, String)>,
+        mut rng: Rng,
+        channels: bool,
+        record_draws: bool,
+        forced_draws: Option<Vec<PyDraw>>,
+    ) -> PyResult<PyBattle> {
+        let (n1, n2) = names.unwrap_or(("Player 1".into(), "Player 2".into()));
+        if record_draws {
+            rng.record_draws();
+        }
+        if let Some(list) = forced_draws {
+            rng.force_draws(&draws_in(list))
+                .map_err(PyValueError::new_err)?;
+        }
+        if channels && !Channel::has_banner_in(&dex.inner) {
+            return Err(PyValueError::new_err(
+                "channels need the banner of the format export: export the format again with refsim/export_format.js",
+            ));
+        }
+        let inner = Battle::new_with_rng(dex.inner.clone(), teams, [&n1, &n2], rng)
+            .map_err(PyValueError::new_err)?;
+        let channel = channels
+            .then(|| Channel::new(&inner))
+            .transpose()
+            .map_err(PyValueError::new_err)?;
+        Ok(PyBattle { inner, channel })
+    }
+
+    /// Keep the channels up to date after a choice (and its error, if refused).
+    fn after_choice(&mut self, side: usize, result: &Result<(), String>) {
+        if let Some(channel) = &mut self.channel {
+            if let Err(message) = result {
+                channel.refusal(&self.inner, side, message);
+            }
+            channel.sync(&self.inner);
+        }
+    }
+
+    fn channel_ref(&self) -> PyResult<&Channel> {
+        self.channel.as_ref().ok_or_else(|| {
+            PyValueError::new_err("this battle has no channels (make it with channels=True)")
+        })
+    }
 }
 
 #[pymethods]
 impl PyBattle {
+    ///
+    /// `channels=True` keeps the stream Showdown sends each player
+    /// (`channel`); `record_draws=True` logs every random draw
+    /// (`take_draws`); `forced_draws` answers the draws made while the
+    /// battle is built (see `set_forced_draws`).
     #[new]
-    #[pyo3(signature = (dex, team1, team2, seed, names=None))]
+    #[pyo3(signature = (dex, team1, team2, seed, names=None, channels=false, record_draws=false, forced_draws=None))]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         dex: &PyDex,
         team1: &str,
         team2: &str,
         seed: u64,
         names: Option<(String, String)>,
+        channels: bool,
+        record_draws: bool,
+        forced_draws: Option<Vec<PyDraw>>,
     ) -> PyResult<PyBattle> {
-        let (n1, n2) = names.unwrap_or(("Player 1".into(), "Player 2".into()));
-        let inner = Battle::new(dex.inner.clone(), [team1, team2], [&n1, &n2], seed)
-            .map_err(PyValueError::new_err)?;
-        Ok(PyBattle { inner })
+        PyBattle::build(
+            dex,
+            [team1, team2],
+            names,
+            Rng::new(seed),
+            channels,
+            record_draws,
+            forced_draws,
+        )
     }
 
     /// Reference mode: a battle whose RNG is Showdown's, seeded like Showdown's
     /// ("sodium,<hex>"), so it draws the same numbers.
     #[staticmethod]
-    #[pyo3(signature = (dex, team1, team2, seed, names=None))]
+    #[pyo3(signature = (dex, team1, team2, seed, names=None, channels=false, record_draws=false, forced_draws=None))]
+    #[allow(clippy::too_many_arguments)]
     fn reference(
         dex: &PyDex,
         team1: &str,
         team2: &str,
         seed: &str,
         names: Option<(String, String)>,
+        channels: bool,
+        record_draws: bool,
+        forced_draws: Option<Vec<PyDraw>>,
     ) -> PyResult<PyBattle> {
-        let (n1, n2) = names.unwrap_or(("Player 1".into(), "Player 2".into()));
-        let rng = crate::rng::Rng::from_showdown_seed(seed).map_err(PyValueError::new_err)?;
-        let inner = Battle::new_with_rng(dex.inner.clone(), [team1, team2], [&n1, &n2], rng)
-            .map_err(PyValueError::new_err)?;
-        Ok(PyBattle { inner })
+        let rng = Rng::from_showdown_seed(seed).map_err(PyValueError::new_err)?;
+        PyBattle::build(
+            dex,
+            [team1, team2],
+            names,
+            rng,
+            channels,
+            record_draws,
+            forced_draws,
+        )
     }
 
     /// Record every RNG draw with its call site (see `rng_trace`).
@@ -316,7 +461,7 @@ impl PyBattle {
             serde_json::from_str(projection).map_err(|e| PyValueError::new_err(e.to_string()))?;
         let inner = Battle::from_projection(dex.inner.clone(), &v, [&n1, &n2], seed)
             .map_err(PyValueError::new_err)?;
-        Ok(PyBattle { inner })
+        Ok(PyBattle::from(inner))
     }
 
     /// The side's current request as Showdown JSON text, or None.
@@ -334,9 +479,10 @@ impl PyBattle {
 
     /// Submit a choice; raises ValueError with Showdown's message if invalid.
     fn choose(&mut self, side: &str, choice: &str) -> PyResult<()> {
-        self.inner
-            .choose(side_index(side)?, choice)
-            .map_err(PyValueError::new_err)
+        let s = side_index(side)?;
+        let result = self.inner.choose(s, choice);
+        self.after_choice(s, &result);
+        result.map_err(PyValueError::new_err)
     }
 
     /// Take back the side's choice before the other side has chosen
@@ -424,7 +570,9 @@ impl PyBattle {
     fn choose_index(&mut self, side: &str, index: usize) -> PyResult<()> {
         let s = side_index(side)?;
         let choice = indexed_choice(&self.inner, s, index)?;
-        self.inner.choose(s, &choice).map_err(PyValueError::new_err)
+        let result = self.inner.choose(s, &choice);
+        self.after_choice(s, &result);
+        result.map_err(PyValueError::new_err)
     }
 
     /// Experimental: enumerate to the next request. Empty strings preserve
@@ -468,8 +616,111 @@ impl PyBattle {
         self.inner.log.len()
     }
 
-    fn set_logging(&mut self, on: bool) {
+    /// The lines of a channel from line `start` on: `viewer` is `p1` or
+    /// `p2` (the stream Showdown sends that player: the log as they see it,
+    /// each `|request|` where Showdown sends it, a `{"wait": true}` request
+    /// for the side with nothing to choose, `|error|` lines for refused
+    /// choices) or `omniscient` (the log with both sides' secrets, no
+    /// requests). Needs `channels=True`.
+    #[pyo3(signature = (viewer, start=0))]
+    fn channel(&self, viewer: &str, start: usize) -> PyResult<Vec<String>> {
+        let v = viewer_index(viewer)?;
+        self.channel_ref()?
+            .lines(&self.inner, v, start)
+            .map_err(PyValueError::new_err)
+    }
+
+    /// The number of lines of a channel (see `channel`).
+    fn channel_len(&self, viewer: &str) -> PyResult<usize> {
+        Ok(self.channel_ref()?.len(viewer_index(viewer)?))
+    }
+
+    /// Forget the lines of a channel before line `upto` (see
+    /// `Batch.discard_channel`).
+    fn discard_channel(&mut self, viewer: &str, upto: usize) -> PyResult<()> {
+        let v = viewer_index(viewer)?;
+        self.channel
+            .as_mut()
+            .ok_or_else(|| {
+                PyValueError::new_err("this battle has no channels (make it with channels=True)")
+            })?
+            .discard(v, upto);
+        Ok(())
+    }
+
+    /// The identity of the side's current request: the SHA-256, as 64
+    /// lower-case hex digits, of the request's canonical JSON (RFC 8785)
+    /// without `rqid`. None when the side has no request (the game is over).
+    fn request_hash(&self, side: &str) -> PyResult<Option<String>> {
+        let s = side_index(side)?;
+        match &self.channel {
+            Some(channel) => channel.request_hash(s),
+            None => self
+                .inner
+                .request_json(s)
+                .map(|r| crate::identity::request_hash(&r))
+                .transpose(),
+        }
+        .map_err(PyValueError::new_err)
+    }
+
+    /// The choices the side may submit, enumerated from its request in the
+    /// order of Areneon's reference enumerator: `[(choice, pending)]`.
+    /// Team Preview lists every ordered pick (360 of four from six, not
+    /// the 90 of `legal_choices`); `pending` is true where the request
+    /// cannot tell the player whether the choice is legal (a trap or a
+    /// disable it hides), so the engine may refuse it. Empty for a side that
+    /// only waits. Raises ValueError for a request with a field the
+    /// enumerator does not know.
+    fn candidates(&mut self, side: &str) -> PyResult<Vec<(String, bool)>> {
+        let s = side_index(side)?;
+        let list = match &mut self.channel {
+            Some(channel) => channel
+                .candidates(s)
+                .map(<[crate::candidates::Candidate]>::to_vec),
+            None => self.inner.candidates(s),
+        }
+        .map_err(|e| PyValueError::new_err(e.0))?;
+        Ok(list.into_iter().map(|c| (c.choice, c.pending)).collect())
+    }
+
+    /// The choice the side has made and not yet had run, in the engine's own
+    /// spelling of what it accepted (two spellings of one action give one
+    /// string); None when it has not chosen.
+    fn chosen(&self, side: &str) -> PyResult<Option<String>> {
+        Ok(self.inner.chosen_text(side_index(side)?))
+    }
+
+    /// The draws made since the last call (since the battle was made, for
+    /// the first), as `(method, args, result)` with strings for numbers: the
+    /// calls of Showdown's PRNG (`random`, `randomChance`, `sample`,
+    /// `shuffle`), each with the result used. Needs `record_draws=True` or
+    /// `set_forced_draws`; empty otherwise.
+    fn take_draws(&mut self) -> Vec<PyDraw> {
+        draws_out(self.inner.rng.take_draws())
+    }
+
+    /// Answer the next draws from a list of `(method, args, result)`
+    /// (forced mode, for replaying a Showdown draw trace): the n-th call
+    /// made from now on takes the result of the n-th entry when its method
+    /// and arguments are the entry's, else the generator's own. Starts the
+    /// log (`take_draws`). Raises ValueError for an entry of a known method
+    /// that is malformed.
+    fn set_forced_draws(&mut self, draws: Vec<PyDraw>) -> PyResult<()> {
+        self.inner
+            .rng
+            .force_draws(&draws_in(draws))
+            .map_err(PyValueError::new_err)
+    }
+
+    fn set_logging(&mut self, on: bool) -> PyResult<()> {
+        if !on && self.channel.is_some() {
+            return Err(PyValueError::new_err(
+                "a battle with channels needs its log",
+            ));
+        }
         self.inner.log_enabled = on;
+        Ok(())
     }
 
     /// Open team sheets: log both teams' sets, as Showdown does at team preview.
@@ -484,12 +735,15 @@ impl PyBattle {
     fn copy(&self) -> PyBattle {
         PyBattle {
             inner: self.inner.clone(),
+            channel: self.channel.clone(),
         }
     }
 
     /// Reseed the engine's RNG (for drawing independent outcomes from a copy).
+    /// Only the generator is replaced (by the fast one): recorded draws and
+    /// forced draws stay as they are.
     fn reseed(&mut self, seed: u64) {
-        self.inner.rng = crate::rng::Rng::new(seed);
+        self.inner.rng.reseed(seed);
     }
 
     /// The read-only damage calculation (`ninjask::calc`) for the move
@@ -689,7 +943,7 @@ impl PyTracker {
         a.seed = seed;
         let inner =
             crate::world::World::from_view(&self.inner, &a).map_err(PyValueError::new_err)?;
-        Ok(PyBattle { inner })
+        Ok(PyBattle::from(inner))
     }
 }
 
@@ -708,12 +962,33 @@ pub struct PyBatch {
 #[pymethods]
 impl PyBatch {
     /// `n` empty battle slots for `dex`'s format; `reset` starts a battle.
+    ///
+    /// `names` are the players' names (default `Player 1`, `Player 2`);
+    /// `channels=True` keeps each battle's channels (`channel`, needs a
+    /// format export with the banner); `record_draws=True` logs each battle's
+    /// random draws (`take_draws`).
     #[new]
-    fn new(dex: &PyDex, n: usize) -> PyBatch {
-        PyBatch {
-            inner: crate::batch::Batch::new(dex.inner.clone(), n),
-            pending: Vec::new(),
+    #[pyo3(signature = (dex, n, names=None, channels=false, record_draws=false))]
+    fn new(
+        dex: &PyDex,
+        n: usize,
+        names: Option<(String, String)>,
+        channels: bool,
+        record_draws: bool,
+    ) -> PyResult<PyBatch> {
+        let mut options = crate::batch::BatchOptions {
+            channels,
+            record_draws,
+            ..Default::default()
+        };
+        if let Some((a, b)) = names {
+            options.names = [a, b];
         }
+        Ok(PyBatch {
+            inner: crate::batch::Batch::with_options(dex.inner.clone(), n, options)
+                .map_err(PyValueError::new_err)?,
+            pending: Vec::new(),
+        })
     }
 
     fn __len__(&self) -> usize {
@@ -731,11 +1006,25 @@ impl PyBatch {
         self.inner.turn_limit = turns;
     }
 
-    /// Start a battle in slot `i` from two packed teams. Raises ValueError
-    /// on a bad team or slot.
-    fn reset(&mut self, i: usize, team1: &str, team2: &str, seed: u64) -> PyResult<()> {
+    /// Start a battle in slot `i` from two packed teams. `seed` is an
+    /// integer (the fast generator) or a Showdown seed, `sodium,<hex>`
+    /// (Showdown's own generator: the battle draws the numbers a Showdown
+    /// battle with that seed draws). `forced_draws` answers the draws made
+    /// while the battle is built (see `set_forced_draws`). Raises
+    /// ValueError on a bad team, seed or slot.
+    #[pyo3(signature = (i, team1, team2, seed, forced_draws=None))]
+    fn reset(
+        &mut self,
+        i: usize,
+        team1: &str,
+        team2: &str,
+        seed: &Bound<'_, PyAny>,
+        forced_draws: Option<Vec<PyDraw>>,
+    ) -> PyResult<()> {
+        let seed = seed_of(seed)?;
+        let forced = forced_draws.map(draws_in);
         self.inner
-            .reset(i, [team1, team2], seed)
+            .reset_seeded(i, [team1, team2], &seed, forced.as_deref())
             .map_err(PyValueError::new_err)
     }
 
@@ -819,7 +1108,7 @@ impl PyBatch {
         slots: Vec<usize>,
         teams1: Vec<String>,
         teams2: Vec<String>,
-        seeds: Vec<u64>,
+        seeds: Vec<Bound<'_, PyAny>>,
     ) -> PyResult<()> {
         let n = slots.len();
         if teams1.len() != n || teams2.len() != n || seeds.len() != n {
@@ -827,11 +1116,123 @@ impl PyBatch {
                 "slots, teams1, teams2 and seeds differ in length",
             ));
         }
-        let starts: Vec<(usize, [&str; 2], u64)> = (0..n)
-            .map(|k| (slots[k], [teams1[k].as_str(), teams2[k].as_str()], seeds[k]))
+        let seeds = seeds.iter().map(seed_of).collect::<PyResult<Vec<Seed>>>()?;
+        let starts: Vec<(usize, [&str; 2], Seed)> = (0..n)
+            .map(|k| {
+                (
+                    slots[k],
+                    [teams1[k].as_str(), teams2[k].as_str()],
+                    seeds[k].clone(),
+                )
+            })
             .collect();
         let inner = &mut self.inner;
-        py.detach(|| inner.reset_many(&starts))
+        py.detach(|| inner.reset_many_seeded(&starts))
+            .map_err(PyValueError::new_err)
+    }
+
+    /// The decisions that are pending, as `(battle, side)` (0 is p1), in
+    /// order: what `observe` reports, without building observations.
+    fn pending(&self) -> Vec<(usize, usize)> {
+        self.inner.pending()
+    }
+
+    /// Submit choices as text: `picks[k] = (battle, side, choice)`. Returns
+    /// uint8 bytes, one per pick: bit 0 set when Showdown refused the choice
+    /// for something the request hid (`[Unavailable choice]`: the decision
+    /// stays pending with a new request), bit 1 when the battle ended, bit 2
+    /// when the choice is invalid (`[Invalid choice]`). With channels the
+    /// error and the new request are in the stream. Raises ValueError for a
+    /// battle that was never started.
+    fn choose<'py>(
+        &mut self,
+        py: Python<'py>,
+        picks: Vec<(usize, usize, String)>,
+    ) -> PyResult<Bound<'py, pyo3::types::PyBytes>> {
+        let refs: Vec<(usize, usize, &str)> =
+            picks.iter().map(|(i, s, c)| (*i, *s, c.as_str())).collect();
+        let inner = &mut self.inner;
+        let res = py
+            .detach(|| inner.choose(&refs))
+            .map_err(PyValueError::new_err)?;
+        self.pending.clear();
+        let flags: Vec<u8> = res.into_iter().map(chosen_bits).collect();
+        Ok(pyo3::types::PyBytes::new(py, &flags))
+    }
+
+    /// `choose`, each pick naming one of the side's candidates by its index
+    /// in `candidates(battle, side)`: `picks[k] = (battle, side, index)`.
+    fn choose_candidates<'py>(
+        &mut self,
+        py: Python<'py>,
+        picks: Vec<(usize, usize, usize)>,
+    ) -> PyResult<Bound<'py, pyo3::types::PyBytes>> {
+        let inner = &mut self.inner;
+        let res = py
+            .detach(|| inner.choose_candidates(&picks))
+            .map_err(PyValueError::new_err)?;
+        self.pending.clear();
+        let flags: Vec<u8> = res.into_iter().map(chosen_bits).collect();
+        Ok(pyo3::types::PyBytes::new(py, &flags))
+    }
+
+    /// The candidates of the side's current request in battle `i`, as
+    /// `Battle.candidates`.
+    fn candidates(&mut self, i: usize, side: &Bound<'_, PyAny>) -> PyResult<Vec<(String, bool)>> {
+        let s = side_of(side)?;
+        let list = self
+            .inner
+            .candidates(i, s)
+            .map_err(|e| PyValueError::new_err(e.0))?;
+        Ok(list.into_iter().map(|c| (c.choice, c.pending)).collect())
+    }
+
+    /// The lines of a channel of battle `i` from line `start` on
+    /// (`Battle.channel`). Needs `channels=True`.
+    #[pyo3(signature = (i, viewer, start=0))]
+    fn channel(&self, i: usize, viewer: &str, start: usize) -> PyResult<Vec<String>> {
+        self.inner
+            .channel(i, viewer_index(viewer)?, start)
+            .map_err(PyValueError::new_err)
+    }
+
+    /// Forget the lines of a channel of battle `i` before line `upto`, which
+    /// the caller has taken: a channel keeps its requests, most of its
+    /// memory. Whole segments are forgotten (lines from `upto` on stay
+    /// readable); asking for forgotten lines raises ValueError.
+    fn discard_channel(&mut self, i: usize, viewer: &str, upto: usize) -> PyResult<()> {
+        self.inner
+            .discard_channel(i, viewer_index(viewer)?, upto)
+            .map_err(PyValueError::new_err)
+    }
+
+    /// The number of lines of a channel of battle `i`.
+    fn channel_len(&self, i: usize, viewer: &str) -> PyResult<usize> {
+        self.inner
+            .channel_len(i, viewer_index(viewer)?)
+            .map_err(PyValueError::new_err)
+    }
+
+    /// The identity of the side's current request in battle `i`
+    /// (`Battle.request_hash`).
+    fn request_hash(&self, i: usize, side: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
+        self.inner
+            .request_hash(i, side_of(side)?)
+            .map_err(PyValueError::new_err)
+    }
+
+    /// The draws battle `i` made since the last call (`Battle.take_draws`).
+    fn take_draws(&mut self, i: usize) -> PyResult<Vec<PyDraw>> {
+        self.inner
+            .take_draws(i)
+            .map(draws_out)
+            .map_err(PyValueError::new_err)
+    }
+
+    /// Force the next draws of battle `i` (`Battle.set_forced_draws`).
+    fn set_forced_draws(&mut self, i: usize, draws: Vec<PyDraw>) -> PyResult<()> {
+        self.inner
+            .set_forced_draws(i, &draws_in(draws))
             .map_err(PyValueError::new_err)
     }
 
@@ -865,7 +1266,7 @@ impl PyBatch {
     fn battle(&self, i: usize) -> PyResult<PyBattle> {
         self.inner
             .battle(i)
-            .map(|b| PyBattle { inner: b.clone() })
+            .map(|b| PyBattle::from(b.clone()))
             .ok_or_else(|| PyValueError::new_err(format!("no battle in slot {i}")))
     }
 }

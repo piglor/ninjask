@@ -555,6 +555,14 @@ impl Battle {
         }
         let ti = self.ident(t);
         log_line!(self, "|-end|{ti}|Stockpile");
+        // Showdown says so (with no generation check) whenever a layer changed one of the two
+        // stats less than it should have: the stat was capped.
+        let layers = i16::from(v.stockpile);
+        if i16::from(v.stockpile_def) != -layers || i16::from(v.stockpile_spd) != -layers {
+            self.add(
+                "|-hint|In Gen 7, Stockpile keeps track of how many times it successfully altered each stat individually.",
+            );
+        }
     }
 
     /// `addVolatile('attract', source)`: nothing when already infatuated or
