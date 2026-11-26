@@ -7,7 +7,8 @@ Fork changes for a training harness (Areneon, ticket #1532): Showdown seeds in
 `docs/n1-seeds-channels-candidates.md`. Games play as before (the same draws
 in the same order for every seed); logs gain ten `|-hint|` lines Showdown
 prints, so `examples/fingerprint` moves from `c826ee9bb327b2d8` to
-`36adc509dbe129d1`.
+`91fb64fa6e58900a` (logs +116 hint lines; the numbers drawn are equal, the draws entry gains 651
+`sort` trace entries of the completed sorted lists).
 
 The entries on the loader, `NINJASK_EXTENSION`, `PROVENANCE.json` schema 2 and the Revival Blessing fix are N0's hardening after the review of the pin sync (PR #3), merged into this branch.
 
