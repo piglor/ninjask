@@ -64,3 +64,30 @@ def test_only_the_holders_own_handler_exists(event):
     for kind in ("abilities", "items"):
         for id_, hs in with_handler(kind, event).items():
             assert hs == [f"on{event}"], (kind, id_, hs)
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Every event the engine sorts handlers for: the committed sets of the export (tests/fixtures/areneon/handler-sets.json)
+
+HANDLER_SETS = FIXTURES / "handler-sets.json"
+EVENTS_RS = Path(__file__).resolve().parents[2] / "src" / "dex" / "events.rs"
+
+
+def rust_events() -> list[str]:
+    """The events of `Event::ALL` in src/dex/events.rs: the ones whose ability and item handlers the engine's sorted
+    lists read from the dex tables."""
+    import re
+
+    text = EVENTS_RS.read_text()
+    start = text.index("pub const ALL: [Event;")
+    return re.findall(r"Event::(\w+)", text[start : text.index("];", start)])
+
+
+def test_the_handler_sets_of_every_sorted_event_are_the_committed_ones():
+    """What Showdown collects for each event the engine sorts (`handler_audit.py --json`), by kind and role: the lists
+    the engine builds have to account for exactly these. A pin that adds or removes a handler fails here, and the list
+    of that event has to be looked at again (the per-event table of docs/n1-seeds-channels-candidates.md)."""
+    committed = json.loads(HANDLER_SETS.read_text())["events"]
+    assert set(rust_events()) <= set(committed), "an event the engine reads from the tables has no committed set"
+    assert set(committed) - set(rust_events()) == {"Start"}, "Start is the one extra: it is the SwitchIn handler of an ability or item"
+    assert audit.handler_sets(DEX, sorted(committed)) == committed

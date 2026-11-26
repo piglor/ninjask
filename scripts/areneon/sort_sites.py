@@ -26,7 +26,7 @@ import ninjask
 
 NAMES = ("p1", "p2")
 CALL = re.compile(r"\.(speed_sort_by|speed_sort|each_event_order|each_event_order_draws)\(")
-SORT = re.compile(r"^# sort (\d+) @ (.+)$")
+SORT = re.compile(r"^# sort (\d+) @ (\S+)(?: of .*)?$")
 DRAW = re.compile(r"^(?:random|randomChance|sample|shuffle)[^@]*@ (.+)$")
 
 

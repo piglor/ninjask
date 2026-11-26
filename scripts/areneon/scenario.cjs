@@ -21,7 +21,7 @@ const zlib = require('zlib');
 const { showdownPath } = require('../../refsim/showdown_path');
 const PS = showdownPath();
 const { BattleStream, Teams } = require(path.join(PS, 'dist', 'sim'));
-const { extractChannelMessages } = require(path.join(PS, 'dist', 'sim', 'battle'));
+const { extractChannelMessages, Battle } = require(path.join(PS, 'dist', 'sim', 'battle'));
 
 const FORMAT = process.env.NINJASK_FORMAT || 'gen9championsvgc2026regmc';
 const text = (v) => (typeof v === 'string' ? v : String(v));
@@ -55,7 +55,8 @@ function recordingSource(target, log) {
 			case 'shuffle': return (items, ...range) => {
 				const order = indices(items.length);
 				t.shuffle(order, ...range);
-				log().push({ method: name, args: [text(items.length), ...range.filter(a => a !== undefined).map(text)], result: order.map(text) });
+				log().push({ method: name, args: [text(items.length), ...range.filter(a => a !== undefined).map(text)], result: order.map(text),
+					...(currentList ? { handlers: currentList } : {}) });
 				const before = [...items];
 				order.forEach((from, i) => { items[i] = before[from]; });
 			};
@@ -99,6 +100,57 @@ function requestRecord(line, seq) {
 	return { request_seq: seq, phase, request_hash: crypto.createHash('sha256').update(canonical(request)).digest('hex') };
 }
 
+// With SCENARIO_HANDLERS=1 each recorded `shuffle` made by `speedSort` also names the handlers of the list it sorted (effect,
+// holder, order, priority, speed, subOrder): what the engine's hand-built list for that event has to contain
+// (scripts/areneon/explain_framing.py reads it). Draws are unchanged otherwise.
+let currentList = null;
+if (process.env.SCENARIO_HANDLERS) {
+	const sort = Battle.prototype.speedSort;
+	Battle.prototype.speedSort = function (list, comparator) {
+		const before = currentList;
+		currentList = list.map(x => ({
+			id: x.effect && x.effect.id, type: x.effect && x.effect.effectType,
+			holder: x.effectHolder && (x.effectHolder.name || x.effectHolder.id || x.effectHolder.constructor.name),
+			order: x.order, priority: x.priority, speed: x.speed, sub: x.subOrder,
+		}));
+		try { return sort.call(this, list, comparator); } finally { currentList = before; }
+	};
+}
+
+// With SCENARIO_SORTS=1 every `speedSort` of a list of two or more is also written, in call order, to the `sorts` of the
+// write it happened in: the list's length and what is in it (an effect's id and holder, an action's choice and Pokémon, a
+// Pokémon). scripts/areneon/sort_sequence.py compares that sequence with the engine's own trace, which shows a handler the
+// engine's list leaves out even where nothing is tied (a tie is the only thing a shuffle shows).
+let sortLog = null;
+if (process.env.SCENARIO_SORTS) {
+	const sort = Battle.prototype.speedSort;
+	const describe = (x) => {
+		if (x && x.effect) return `${x.effect.effectType}:${x.effect.id}@${x.effectHolder && (x.effectHolder.name || x.effectHolder.id || x.effectHolder.constructor.name)}`;
+		if (x && x.choice) return `action:${x.choice}@${x.pokemon && x.pokemon.name}`;
+		if (x && x.name) return `pokemon:${x.name}`;
+		return '?';
+	};
+	// The event whose handlers the list holds: the innermost `runEvent`, `eachEvent`, `fieldEvent` or `residualEvent` that is
+	// sorting (the sort is the first thing each of them does, before it runs a handler that could nest another).
+	const events = [];
+	for (const name of ['runEvent', 'singleEvent', 'eachEvent', 'fieldEvent', 'residualEvent']) {
+		const original = Battle.prototype[name];
+		Battle.prototype[name] = function (...args) {
+			events.push(`${name}:${typeof args[0] === 'string' ? args[0] : '?'}`);
+			try { return original.apply(this, args); } finally { events.pop(); }
+		};
+	}
+	Battle.prototype.speedSort = function (list, comparator) {
+		if (sortLog && list.length >= 2) {
+			sortLog.push({
+				n: list.length, event: events[events.length - 1] || '', items: list.map(describe),
+				keys: list.map(x => [x.order, x.priority, x.subOrder, x.speed]),
+			});
+		}
+		return sort.call(this, list, comparator);
+	};
+}
+
 function play(scenario) {
 	if (scenario.teams) scenario = { ...scenario, packed: { p1: Teams.pack(scenario.teams.p1), p2: Teams.pack(scenario.teams.p2) } };
 	const channels = { p1: [], p2: [], omniscient: [] };
@@ -117,9 +169,10 @@ function play(scenario) {
 	const writes = [];
 	const write = (kind, payload) => {
 		cur = [];
+		sortLog = process.env.SCENARIO_SORTS ? [] : null;
 		stream._writeLines(payload);
 		stream.battle.sendUpdates();
-		writes.push({ kind, draws: cur });
+		writes.push({ kind, draws: cur, ...(sortLog ? { sorts: sortLog } : {}) });
 	};
 	write('player', `>player p1 ${JSON.stringify({ name: 'p1', team: scenario.packed.p1 })}`);
 	write('player', `>player p2 ${JSON.stringify({ name: 'p2', team: scenario.packed.p2 })}`);

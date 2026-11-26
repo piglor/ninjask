@@ -283,50 +283,100 @@ impl Battle {
     /// happen: `Some(false)` a failure, `None` (recharging) not one.
     fn before_move(&mut self, r: MonRef, move_id: Option<MoveId>) -> Result<(), Option<bool>> {
         let ident = self.ident(r);
-        // runEvent sorts every handler before any runs, so ties draw first,
-        // highest priority first: Throat Chop and Heal Block (6), then the
-        // foes' Imprisons (4) at equal speed.
+        // `runEvent('BeforeMove')` sorts every handler before any runs, once: ties draw first,
+        // highest priority first (Chilly Reception and Glaive Rush 100, Throat Chop and Heal Block
+        // 6, the foes' Imprisons 4, at equal speed), and every handler present is in the list
+        // whether or not it acts: the user's status and volatiles, Gravity and the foes' Imprison,
+        // with their priorities from the dex.
         use crate::abilities::{compare_mod, ModHandler};
-        let mut six: Small<bool> = Small::new(); // true: Heal Block
-        if self.mon(r).vol.throat_chop > 0 {
-            six.push(false);
+        #[derive(Clone, Copy, PartialEq)]
+        enum B {
+            HealBlock,
+            ThroatChop,
+            Imprison(MonRef),
+            Other,
         }
-        if self.mon(r).vol.heal_block > 0 {
-            six.push(true);
+        let mut handlers: Small<(B, ModHandler)> = Small::new();
+        {
+            let (m, speed) = (self.mon(r), self.mon(r).speed);
+            let status = match m.status {
+                Status::Slp => "slp",
+                Status::Frz => "frz",
+                Status::Par => "par",
+                _ => "",
+            };
+            let own = [
+                (status, !status.is_empty(), 0, B::Other),
+                ("mustrecharge", m.vol.must_recharge > 0, 2, B::Other),
+                ("flinch", m.vol.flinch, 2, B::Other),
+                ("disable", m.vol.disable.is_some(), 2, B::Other),
+                ("throatchop", m.vol.throat_chop > 0, 2, B::ThroatChop),
+                ("taunt", m.vol.taunt > 0, 2, B::Other),
+                ("confusion", m.vol.confusion > 0, 2, B::Other),
+                ("attract", m.vol.attract.is_some(), 2, B::Other),
+                ("choicelock", m.vol.choice_lock.is_some(), 2, B::Other),
+                ("destinybond", m.vol.destiny_bond, 2, B::Other),
+                ("glaiverush", m.vol.glaive_rush, 2, B::Other),
+                ("chillyreception", m.vol.chilly_reception, 2, B::Other),
+            ];
+            for (id, on, sub, tag) in own {
+                if on {
+                    if let Some(p) = self
+                        .dex
+                        .condition_priority(id, Event::BeforeMove, Role::Own)
+                    {
+                        handlers.push((tag, ModHandler::new(p, speed, sub)));
+                    }
+                }
+            }
+            // Heal Block is not in the export (no Heal Block move in the format): priority 6.
+            if m.vol.heal_block > 0 {
+                handlers.push((B::HealBlock, ModHandler::new(6, speed, 2)));
+            }
+            // Gravity, a pseudo-weather: no speed, subOrder 5.
+            if self.field.gravity > 0 {
+                if let Some(p) =
+                    self.dex
+                        .condition_priority("gravity", Event::BeforeMove, Role::Own)
+                {
+                    handlers.push((B::Other, ModHandler::new(p, 0, 5)));
+                }
+            }
+            for f in self.foes_of(r) {
+                if self.mon(f).vol.imprison {
+                    if let Some(p) =
+                        self.dex
+                            .condition_priority("imprison", Event::BeforeMove, Role::Foe)
+                    {
+                        handlers.push((B::Imprison(f), ModHandler::new(p, self.mon(f).speed, 2)));
+                    }
+                }
+            }
         }
-        if six.len() > 1 {
-            let speed = self.mon(r).speed;
-            let mut hs: Small<(bool, ModHandler)> = six
-                .iter()
-                .map(|&k| (k, ModHandler::new(6, speed, 2)))
-                .collect();
-            self.speed_sort_by(&mut hs, |a, b| compare_mod(&a.1, &b.1));
-            six = hs.into_iter().map(|(k, _)| k).collect();
+        if handlers.len() > 1 {
+            self.speed_sort_by(&mut handlers, |a, b| compare_mod(&a.1, &b.1));
         }
-        let mut imprisoners: Small<(MonRef, ModHandler)> = self
-            .foes_of(r)
-            .into_iter()
-            .filter(|&f| self.mon(f).vol.imprison)
-            .map(|f| (f, ModHandler::new(4, self.mon(f).speed, 2)))
+        let six: Small<bool> = handlers
+            .iter()
+            .filter_map(|(b, _)| match b {
+                B::HealBlock => Some(true),
+                B::ThroatChop => Some(false),
+                _ => None,
+            })
             .collect();
-        if imprisoners.len() > 1 {
-            self.speed_sort_by(&mut imprisoners, |a, b| compare_mod(&a.1, &b.1));
-        }
+        let imprisoners: Small<(MonRef, ModHandler)> = handlers
+            .iter()
+            .filter_map(|&(b, h)| match b {
+                B::Imprison(f) => Some((f, h)),
+                _ => None,
+            })
+            .collect();
         // Chilly Reception's onBeforeMove (priority 100): `-prepare` before
-        // any other check, with Glaive Rush's drawback ending before the
-        // user's next move at the same priority.
+        // any other check; with Glaive Rush's drawback ending before the
+        // user's next move at the same priority (their tie is in the sort above).
         let chilly =
             move_id.is_some_and(|id| self.dex.move_kind[id as usize] == MoveKind::ChillyReception);
         if self.mon(r).vol.chilly_reception && chilly {
-            if self.mon(r).vol.glaive_rush {
-                // Both handlers tie on priority, speed and subOrder.
-                let speed = self.mon(r).speed;
-                let mut hs = [
-                    ModHandler::new(100, speed, 2),
-                    ModHandler::new(100, speed, 2),
-                ];
-                self.speed_sort_by(&mut hs, compare_mod);
-            }
             let ri = self.ident(r);
             log_line!(self, "|-prepare|{ri}|Chilly Reception|[premajor]");
         }
@@ -1134,6 +1184,9 @@ impl Battle {
                     MagicBounce,
                     SapSipper,
                     Soundproof,
+                    /// An ability with an `onTryHit` handler the engine acts on elsewhere, or not at all
+                    /// for a move aimed at a side: it is in Showdown's sort all the same.
+                    Inert,
                 }
                 let side = if mv.target == Target::FoeSide {
                     1 - r.0
@@ -1144,16 +1197,24 @@ impl Battle {
                     .filter_map(|sl| self.active(side, sl))
                     .filter(|&h| self.mon(h).hp > 0 && !self.mon(h).fainted)
                     .filter_map(|h| {
+                        // From the dex: every ability with an `onAllyTryHitSide` handler (Magic
+                        // Bounce, Sap Sipper, Soundproof), none of which sets a priority.
+                        let priority = self.dex.ability_handlers[self.mon(h).ability as usize]
+                            .priority(Event::TryHitSide, Role::Ally)?;
                         let k = match self.dex.ability(self.mon(h).ability).id.as_str() {
                             "magicbounce" => A::MagicBounce,
                             "sapsipper" => A::SapSipper,
                             "soundproof" => A::Soundproof,
-                            _ => return None,
+                            _ => A::Inert,
                         };
                         Some((
                             h,
                             k,
-                            ModHandler::new(0, self.mon(h).stats[Stat::Spe as usize] as i32, 7),
+                            ModHandler::new(
+                                priority,
+                                self.mon(h).stats[Stat::Spe as usize] as i32,
+                                7,
+                            ),
                         ))
                     })
                     .collect();
@@ -1565,7 +1626,13 @@ impl Battle {
             let last_target = last;
             let hp_before = self.mon(r).hp;
             self.run_after_move_secondary_self(r, last_target, kind);
-            if !self.magician_on_after_move_secondary_self(r, &live, mv) {
+            // Magician sorts `move.hitTargets`: every Pokémon the move hit, one that fainted of it
+            // included.
+            let hit_targets: Vec<MonRef> = match &self.active_move.hit_targets {
+                Some(t) => t.iter().copied().collect(),
+                None => live.to_vec(),
+            };
+            if !self.magician_on_after_move_secondary_self(r, &hit_targets, mv) {
                 self.after_move_secondary_self(r, last_target, mv, total_damage);
             }
             // EmergencyExit for a user that Life Orb took to half HP or less.

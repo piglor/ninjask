@@ -1,0 +1,293 @@
+{
+ "input": {
+  "bench_alive": [
+   [],
+   [
+    3
+   ]
+  ],
+  "choices": [
+   {
+    "choice": "team 1234",
+    "player": "p1"
+   },
+   {
+    "choice": "team 1234",
+    "player": "p2"
+   },
+   {
+    "choice": "move 2, move 2",
+    "player": "p1"
+   },
+   {
+    "choice": "move 1, move 2",
+    "player": "p2"
+   },
+   {
+    "choice": "switch 3, switch 4",
+    "player": "p1"
+   },
+   {
+    "choice": "move 1, move 1",
+    "player": "p1"
+   },
+   {
+    "choice": "move 2, move 2",
+    "player": "p2"
+   },
+   {
+    "choice": "pass, pass",
+    "player": "p1"
+   }
+  ],
+  "flagged": [
+   0,
+   1
+  ],
+  "packed": {
+   "p1": "Fodder1|Pikachu||static|Protect,Teatime|Hardy|||||50|]Fodder2|Dedenne||cheekpouch|Protect,Teatime|Hardy|||||50|]Reviver1|Pawmot||naturalcure|RevivalBlessing,Protect,Teatime|Jolly|0,0,0,0,0,32||||50|]Reviver2|Pawmot||naturalcure|RevivalBlessing,Protect,Teatime|Hardy|||||50|",
+   "p2": "Chomp|Garchomp||roughskin|Earthquake,Protect|Adamant|0,32,0,0,0,32||||50|]Corv|Corviknight||pressure|Protect,Teatime|Hardy|||||50|]Snor|Snorlax||thickfat|Protect|Hardy|||||50|]Clef|Clefable||magicguard|Protect|Hardy|||||50|"
+  },
+  "seed": "sodium,b87301f269c2ef29b0dcc6cc78cecdce4e9b0d4d8a8c3af9ada7568b8a39160b"
+ },
+ "output": [
+  {
+   "accepted": [
+    "switch 3, switch 3",
+    "switch 3, switch 4",
+    "switch 3, pass",
+    "switch 4, switch 3",
+    "switch 4, switch 4",
+    "switch 4, pass",
+    "pass, switch 3",
+    "pass, switch 4",
+    "pass, pass"
+   ],
+   "bench_alive": [],
+   "request": {
+    "forceSwitch": [
+     true,
+     true
+    ],
+    "noCancel": true,
+    "side": {
+     "id": "p1",
+     "name": "p1",
+     "pokemon": [
+      {
+       "ability": "naturalcure",
+       "active": true,
+       "baseAbility": "naturalcure",
+       "commanding": false,
+       "condition": "145/145",
+       "details": "Pawmot, L50, F",
+       "ident": "p1: Reviver1",
+       "item": "",
+       "moves": [
+        "revivalblessing",
+        "protect",
+        "teatime"
+       ],
+       "pokeball": "pokeball",
+       "reviving": true,
+       "stats": {
+        "atk": 135,
+        "def": 90,
+        "spa": 81,
+        "spd": 80,
+        "spe": 172
+       }
+      },
+      {
+       "ability": "naturalcure",
+       "active": true,
+       "baseAbility": "naturalcure",
+       "commanding": false,
+       "condition": "145/145",
+       "details": "Pawmot, L50, M",
+       "ident": "p1: Reviver2",
+       "item": "",
+       "moves": [
+        "revivalblessing",
+        "protect",
+        "teatime"
+       ],
+       "pokeball": "pokeball",
+       "reviving": true,
+       "stats": {
+        "atk": 135,
+        "def": 90,
+        "spa": 90,
+        "spd": 80,
+        "spe": 125
+       }
+      },
+      {
+       "ability": "static",
+       "active": false,
+       "baseAbility": "static",
+       "commanding": false,
+       "condition": "0 fnt",
+       "details": "Pikachu, L50, M",
+       "ident": "p1: Fodder1",
+       "item": "",
+       "moves": [
+        "protect",
+        "teatime"
+       ],
+       "pokeball": "pokeball",
+       "reviving": false,
+       "stats": {
+        "atk": 75,
+        "def": 60,
+        "spa": 70,
+        "spd": 70,
+        "spe": 110
+       }
+      },
+      {
+       "ability": "cheekpouch",
+       "active": false,
+       "baseAbility": "cheekpouch",
+       "commanding": false,
+       "condition": "0 fnt",
+       "details": "Dedenne, L50, M",
+       "ident": "p1: Fodder2",
+       "item": "",
+       "moves": [
+        "protect",
+        "teatime"
+       ],
+       "pokeball": "pokeball",
+       "reviving": false,
+       "stats": {
+        "atk": 78,
+        "def": 77,
+        "spa": 101,
+        "spd": 87,
+        "spe": 121
+       }
+      }
+     ]
+    }
+   }
+  },
+  {
+   "accepted": [
+    "switch 3, switch 3",
+    "switch 3, pass",
+    "pass, switch 3"
+   ],
+   "bench_alive": [
+    3
+   ],
+   "request": {
+    "forceSwitch": [
+     true,
+     true
+    ],
+    "noCancel": true,
+    "side": {
+     "id": "p1",
+     "name": "p1",
+     "pokemon": [
+      {
+       "ability": "naturalcure",
+       "active": true,
+       "baseAbility": "naturalcure",
+       "commanding": false,
+       "condition": "145/145",
+       "details": "Pawmot, L50, F",
+       "ident": "p1: Reviver1",
+       "item": "",
+       "moves": [
+        "revivalblessing",
+        "protect",
+        "teatime"
+       ],
+       "pokeball": "pokeball",
+       "reviving": true,
+       "stats": {
+        "atk": 135,
+        "def": 90,
+        "spa": 81,
+        "spd": 80,
+        "spe": 172
+       }
+      },
+      {
+       "ability": "naturalcure",
+       "active": true,
+       "baseAbility": "naturalcure",
+       "commanding": false,
+       "condition": "145/145",
+       "details": "Pawmot, L50, M",
+       "ident": "p1: Reviver2",
+       "item": "",
+       "moves": [
+        "revivalblessing",
+        "protect",
+        "teatime"
+       ],
+       "pokeball": "pokeball",
+       "reviving": true,
+       "stats": {
+        "atk": 135,
+        "def": 90,
+        "spa": 90,
+        "spd": 80,
+        "spe": 125
+       }
+      },
+      {
+       "ability": "static",
+       "active": false,
+       "baseAbility": "static",
+       "commanding": false,
+       "condition": "0 fnt",
+       "details": "Pikachu, L50, M",
+       "ident": "p1: Fodder1",
+       "item": "",
+       "moves": [
+        "protect",
+        "teatime"
+       ],
+       "pokeball": "pokeball",
+       "reviving": false,
+       "stats": {
+        "atk": 75,
+        "def": 60,
+        "spa": 70,
+        "spd": 70,
+        "spe": 110
+       }
+      },
+      {
+       "ability": "cheekpouch",
+       "active": false,
+       "baseAbility": "cheekpouch",
+       "commanding": false,
+       "condition": "142/142",
+       "details": "Dedenne, L50, M",
+       "ident": "p1: Fodder2",
+       "item": "",
+       "moves": [
+        "protect",
+        "teatime"
+       ],
+       "pokeball": "pokeball",
+       "reviving": false,
+       "stats": {
+        "atk": 78,
+        "def": 77,
+        "spa": 101,
+        "spd": 87,
+        "spe": 121
+       }
+      }
+     ]
+    }
+   }
+  }
+ ]
+}

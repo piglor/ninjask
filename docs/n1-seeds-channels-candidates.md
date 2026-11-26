@@ -67,7 +67,7 @@ pin sync, #1531) and on the hand-built scenarios of the hint audit below:
   for, followed by the side's request again with `"update":true` (the next
   `request_seq`).
 - the **hints** (`|-hint|...`) that Showdown prints where the engine's log had
-  none: ten of the fifteen places a battle of this format can reach, listed in the audit below. They change the engine's own log
+  none: twelve of the seventeen places a battle of this format can reach, listed in the audit below. They change the engine's own log
   (they are in `omniscient` too), which moves `examples/fingerprint` (see
   CHANGELOG).
 
@@ -125,19 +125,35 @@ a control that prints none.
 | `moves.ts` 798 | Aura Wheel used by a non-Morpeko (Copycat) | yes | prints (`aurawheel-copycat`) |
 | `moves.ts` 3370 Dark Void, 9174 Hyperspace Fury, 9690 Ion Deluge, 10997 Mat Block | the moves | no: not in the format's move list | not applicable |
 | `moves.ts` 3504 Destiny Bond, 15442 Roost, `battle-actions.ts` 1925 | Dynamax, Terastallization, Ogerpon's Tera | no: neither exists in the format | not applicable |
-| `moves.ts` 17999 Stockpile; `battle.ts` 2060, 2240, 2243; `battle-actions.ts` 143 | Gen 7, Gen 2, Gen 1, Gen 3-4 rules | no: Gen 9 | not applicable |
+| `moves.ts` 17999 Stockpile | the stockpile ends with Defense or Special Defense not equal to minus the layers (it is capped at +6, or was changed in between): the hint has no generation check | yes | **added** (`stockpile-def-capped`) |
+| `battle.ts` 2060, 2240, 2243; `battle-actions.ts` 143 | Gen 2, Gen 1, Gen 3-4 rules | no: Gen 9 | not applicable |
 | `battle.ts` 2774, 2780 | a switch cancelled by a Pursuit faint (`pursuitfaint`) | no: Pursuit is not a move of the format | not applicable |
 | `abilities.ts` 2085 Illusion Level Mod; `rulesets.ts` 1396 Sleep Clause Mod | rules the format does not have | no | not applicable |
-| `battle-actions.ts` 64 | `switchIn` of a Pokémon that is already in | not shown reachable: a validated choice never names an active Pokémon and a switch action precedes every move; no recorded battle or scenario reaches it | not printed (unverified) |
+| `battle-actions.ts` 64 | `switchIn` of a Pokémon that is already in | yes, through a queued switch whose Pokémon another switch has moved: Emergency Exit's forced switch, answered in the middle of the switch phase, brings the Pokémon a still-queued switch names in at the other slot. Showdown's queued action holds the Pokémon, the engine's held its position, which the first switch had changed | **fixed and added** (`switchin-already-in-emergency-exit`): the hint prints, the slot stays as it was; see below |
 
-Of the fifteen reachable sites the engine already printed five (Aura Wheel, Mimicry, Shell
+Of the seventeen reachable sites the engine already printed five (Aura Wheel, Mimicry, Shell
 Side Arm in both places, Wonder Room); the first scan of the 3,200 recorded battles found
 five more it omitted (Skill Swap, Future Sight that does not hit, Prankster, Rising Voltage,
 Psychic Terrain); the audit found five that none of those battles holds (Fake Out and First
 Impression after Copycat or Instruct, the `cantusetwice` hint, and the two turn-overflow
-hints). The claim is therefore: these are **all** the `|-hint|` lines of the pin that a
-battle of this format can produce, except the last row, which is argued, not shown. Mat
-Block, Dark Void and the others would need a format that has the move.
+hints); the review of the first version found two more, the Stockpile hint (its site has no
+generation check) and the `switchIn` of a Pokémon that is already in. The claim is therefore:
+these are **all** the `|-hint|` lines of the pin that a battle of this format can produce. Each
+has a scenario that Showdown recorded, and `test_every_hint_that_is_reachable_in_the_format_has_a_scenario`
+holds the set of hints the scenarios print to this table. What cannot be shown is that no reachable
+site was missed in the 32 the audit found; the audit is of the pin's source (`battle.hint(` and
+`add('-hint'`), and it is as complete as that search. Mat Block, Dark Void and the others would need a
+format that has the move.
+
+**The queued switch (engine bug, found by the review).** A switch action Showdown queues names
+a `Pokemon`; the engine's named a position of the side's list. When a forced switch in the middle of
+the switch phase (Emergency Exit) swapped the positions of two Pokémon, the queued switch of the
+other slot pointed at whoever had moved to that position, and the engine switched in a Pokémon that was
+already in (the same bug, the same hint). `positions_swapped` now turns the position of every queued
+switch and revival of that side with the swap, as the other references to positions already followed it
+(`follow_swap_volatile_refs`), Ally Switch's swap does the same, and a switch whose Pokémon is in prints
+the hint and changes nothing. The sites that queue a position were audited: the switch and revival actions
+of the queue are the only ones (a move's target is a slot, which does not move).
 
 ## 3. Candidates
 
@@ -154,7 +170,28 @@ the request JSON (`ninjask::candidates`):
   its Mega Evolution variants after it; then the bench switches), and for each
   the second slot's options; pairs the engine always refuses (one Pokémon
   switched in twice, Mega Evolution on both) are left out. A forced switch:
-  the bench in order, then `pass`; Revival Blessing as in the reference.
+  the bench in order, then `pass`; Revival Blessing as in the reference for one
+  reviving slot (a fainted Pokémon of the side by position, `pass` only without a living
+  bench Pokémon).
+- **Two reviving slots** (both Revival Blessing users answered at once: the first one
+  passed because nobody lives on the bench, the second used its own) are listed where the
+  reference throws `EnumerationError` (`choices.ts`; N0's rule change: Showdown accepts
+  `switch N, switch N` there, since a revival is not recorded in `switchIns`, and `pass` as the
+  engine's two counters allow it: `clearChoice` starts a forced switch for each living
+  bench Pokémon up to the number of flagged slots and one forced pass for each slot left,
+  a revival uses neither, a `pass` uses a forced pass). With `b` living bench Pokémon: nine
+  combinations of {each fainted Pokémon, `pass`} for each slot at `b = 0`, those without a
+  second `pass` at `b = 1`, no `pass` at `b >= 2`. First slot outer, then second. The set is
+  Showdown's own: `tests/fixtures/areneon/two-revivers.json` holds the request of the state
+  play reaches (`b = 0`, nine accepted) and of the same state with one fainted bench
+  Pokémon made alive by hand (`b = 1`, three accepted), each with every combination
+  `Side.choose` took on the pinned Showdown (`scripts/areneon/revival_probe.cjs`;
+  `tests/python/test_n1_revival.py` re-runs it live). The `b = 1` state is not one a
+  battle reaches (the first reviver may pass only while nobody lives on the bench, and
+  nothing changes the bench before the second reviver's request); it is checked by the probe,
+  not by play. The TypeScript comparison counts "the reference throws" as a class of its own
+  and holds those requests out of the equality (the class is two flagged slots; one flagged
+  slot, the reachable single reviver, is compared as before).
 - `pending` is true when the request cannot tell the player whether the
   choice is legal (`maybeTrapped`, `maybeDisabled`, `maybeLocked`): the engine
   may refuse it, and the refusal is how the player finds out. A refusal of a
@@ -219,67 +256,33 @@ Showdown's draws call for call, the two recorded battles are regression tests
 (`keeneye-gravity-wonderroom`). `tests/python/test_n1_handlers.py` holds the sets of
 abilities and items with such a handler in this format: a pin that adds one fails it.
 
-How much of this is checked is measured, not claimed (`scripts/areneon/sort_sites.py`,
-which replays the corpus with the engine's own sort trace): of the 43 call sites of the
-sorting helpers in `src/`, 16 drew between ties in the 3,200 battles and their framing equals
-Showdown's there (7 more sorts are reached through the helpers and attributed to a wrapper's
-line, and drew too). At the other 27 no shuffle was attributed in the corpus: 11 sorted
-lists of two or more with no tie, 16 were not reached at all. Their framing is
-**unaudited**: it is only as complete as the list each one builds. They include the
-`BeforeMove` lists of `use_move.rs` (Throat Chop and Heal Block at priority 6, the foes'
-Imprisons at 4, Chilly Reception), the `Accuracy`, `ModifySecondaries`, `SetStatus`,
-`AfterMove` and `AfterMoveSecondary` lists, the trap lists and the berries'. The consequence
-of a gap there is the one above: a forced replay that does not match one shuffle and then
-uses the engine's own draw; a natural game is unaffected.
+**What is checked, measured.** A shuffle shows an omitted handler only when handlers tie; the
+*length* of a sorted list shows it wherever the list is sorted. `scripts/areneon/sort_sequence.py`
+replays each battle on Showdown with every `speedSort` of two or more logged (its event, its handlers
+with order, priority, subOrder and speed) and through the engine with its own sort trace. The lists of
+Pokémon and actions (the same on both sides) anchor the two sequences; between two anchors every Showdown
+handler list in which two entries share order, priority and subOrder (so a tie is possible, drawn or not)
+must have an engine list of the same length. Result on the 3,200 recorded battles plus the scenarios and
+gap battles (3,236 battles, 937,952 sorts of two or more in Showdown): the anchors are equal in every
+battle, 45,631 handler lists, 9,667 of them tie-capable, and all 9,667 have an engine list of the same
+length. The tool found, before the lists below were completed, SwitchIn lists without Choice Scarf and
+Metronome, and the fuzz found the Damage, TryHit, TryHeal and BeforeMove lists.
 
-## Evaluation only
+Lists built from the dex tables (`Event::ALL`, 29 events, `tests/fixtures/areneon/handler-sets.json` holds
+what each has per kind and role and `test_n1_handlers.py` holds it to the export): the abilities and items of
+ModifyMove, Update, Damage, TryHit (side moves), TryHeal, SwitchIn (an `onStart` is the SwitchIn handler of an
+ability or item, at its `onSwitchInPriority`: `getCallback`), ModifyDamage, DisableMove, trapping and the
+others of the table. Conditions (statuses, volatiles, side and field conditions) are added by hand per list
+(BeforeMove, Update, ModifySpe, Immunity, TryAddVolatile, ModifyAccuracy ...) and are covered by the
+measurement above for the situations the corpora reach, not by a table. Where the engine acts on a handler it
+does not model (Choice Scarf's `onStart`) it carries an inert entry.
 
-Some of this API reads what a player must never see, and is for the harness's
-evaluation and tooling, not for anything that feeds a policy: the `omniscient` channel
-(both sides' exact values and secrets), `Battle.chosen(side)` (a side's pending choice,
-the other side's included), `take_draws` / `set_forced_draws` (the random outcomes of a
-battle), `show_team_sheets` (writes the opponent's sets into the log) and, for
-the same reason, a recording's omniscient log and draw trace. A policy's input is its
-own player channel and the candidates built from its own request.
-`tests/python/test_n1_channels.py` has a canary for this boundary: it scans the player
-channels of fresh and recorded battles for the other player's request or error, the
-other side's exact hit points and an unresolved split marker, and it flags the
-omniscient log fed to the same check.
-
-## Cost
-
-Measured on one thread (`RAYON_NUM_THREADS=1`, pinned to a core, `nice 19`) on a shared
-workstation (load average 4 to 8), not claimed to repeat. Pool: 978 generated
-teams.
-
-**The existing path did not slow down.** `examples/batch_bench` (random policy,
-every decision observed), `origin/main` (the pin sync, `d5db5b8`) and this branch
-alternating, six runs each, decisions per second, medians (measured again after the
-hint additions and the completed lists; the fixture export of the pin for both):
-
-| battles in flight | origin/main | this branch | ratio |
-|---|---|---|---|
-| 64 | 69,361 | 68,865 | 0.993 |
-| 256 | 62,094 | 60,365 | 0.972 |
-| 1024 | 53,971 | 52,723 | 0.977 |
-
-(Run-to-run spread within one binary is about plus or minus 8%; before the pin sync
-and the hints the same comparison against the evaluated commit gave 0.999, 1.017 and
-0.974. The extended lists sort a list of two for the Pokémon whose ability and item both
-have a `ModifyMove` handler or that have a volatile with an `Update` one, which is rare.)
-
-**Showdown seeds** cost about 3%: `batch_bench` with 256 battles, 54,400 to
-58,600 decisions/s with `sodium,<hex>` seeds against 56,400 to 59,400 with
-integer seeds. The generator is one ChaCha20 block per draw.
-
-**The channel path** (`examples/channel_bench`: candidates, a choice by index,
-both players' new lines read and discarded; no observation) plays about 12,000
-to 13,000 decisions/s with 256 battles in flight, with integer or Showdown seeds
-alike. Where the time goes (the engine's own step is about 11 us of the
-roughly 80 us a decision): building each side's request as a JSON value
-(about 36 us a request, two requests a stop), writing it, and storing it.
-A request written straight to text from the engine's state, without the JSON
-value, is the next step for this path.
+Not shown: lists of handlers that exist only in situations the corpora and 11,000 fresh fuzz battles never
+reach (a list whose tie needs two rare conditions at once). The consequence of such a gap is one forced
+replay (`set_forced_draws`) that does not match a shuffle and then uses the engine's own draw; a natural game
+is unaffected. A separate class was found by the fuzz and fixed: a fainted target whose user also fainted has
+no handlers (`isActive`), and a handler Showdown never collects (Shield Dust on a Pollen Puff target) must not
+draw.
 
 ## Known gaps
 
@@ -291,9 +294,9 @@ value, is the next step for this path.
   and `turns == max_turns + 1`. A harness that must reproduce that cut sets
   `turn_limit = max_turns + 1` and writes the tie itself (the engine has no forced tie):
   N2 has to decide whether the engine writes it.
-- **Framing of a shuffle at the 27 unexercised sorted-list call sites** (see section 4):
-  unaudited, not known wrong.
-- **`switchIn` of an active Pokémon** is the one hint site not shown unreachable (above).
+- **Framing of a shuffle in handler lists no corpus reaches** (see section 4): the lists are
+  complete wherever the 3,236 recorded battles and the fresh fuzz reach a possible tie; a
+  list for a situation none reaches is as complete as its table and hand-added conditions.
 - **No direct request-text writer.** A request is built as a JSON value and then
   written; about 60% of the channel path's time is that value (see "Cost"). A writer
   from the engine's state to the request text is the next step for throughput.

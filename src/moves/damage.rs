@@ -707,45 +707,48 @@ impl Battle {
         true
     }
 
-    /// The `Damage` event's handler sort (`runEvent('Damage')`): the
-    /// target's Disguise (1), Poison Heal (1), Sturdy (-30), Rock Head,
-    /// Gluttony, Magic Guard, Berserk and Heatproof (0), Endure (-10) and
-    /// Focus Sash or Band (-40), and
-    /// every active Pokémon's Damp (`onAnyDamage`, 0). Equal ones draw; their
-    /// effects are applied where they act.
+    /// The `Damage` event's handler sort (`runEvent('Damage')`), from the dex's tables: the
+    /// target's ability (Disguise and Poison Heal 1, Sturdy -30, Rock Head, Gluttony, Magic
+    /// Guard, Berserk and Heatproof 0) and item (Focus Sash or Band -40), its Endure volatile
+    /// (-10) and every active Pokémon's `onAnyDamage` (Damp, 0). Equal ones draw; their effects
+    /// are applied where they act.
     pub(super) fn damage_event_sort(&mut self, t: MonRef) {
         use crate::abilities::{compare_mod, ModHandler};
-        use crate::kinds::{AbilityKind, ItemKind};
+        use crate::dex::events::{Event, Role};
+        use crate::kinds::AbilityKind;
+        let ev = Event::Damage;
         let speed = self.mon(t).speed;
         let mut hs: Small<ModHandler> = Small::new();
-        // The ability's handler (one at most): by the raw ability, except
-        // Poison Heal's.
-        match self.raw_ability_kind(t) {
-            AbilityKind::Sturdy => hs.push(ModHandler::new(-30, speed, 7)),
-            AbilityKind::RockHead
-            | AbilityKind::Gluttony
-            | AbilityKind::MagicGuard
-            | AbilityKind::Berserk
-            | AbilityKind::Heatproof => hs.push(ModHandler::new(0, speed, 7)),
-            AbilityKind::Disguise => hs.push(ModHandler::new(1, speed, 7)),
-            _ if self.has_ability(t, AbilityKind::PoisonHeal) => {
-                hs.push(ModHandler::new(1, speed, 7))
+        // The ability's handler: by the raw ability (a suppressed one still sorts), except Poison
+        // Heal's, which the engine has always sorted only while it is in force.
+        if let Some(p) =
+            self.dex.ability_handlers[self.mon(t).ability as usize].priority(ev, Role::Own)
+        {
+            let poison_heal = self.dex.ability(self.mon(t).ability).id == "poisonheal";
+            if !poison_heal || self.has_ability(t, AbilityKind::PoisonHeal) {
+                hs.push(ModHandler::new(p, speed, 7));
             }
-            _ => {}
         }
-        if matches!(
-            self.item_kind(t),
-            Some(ItemKind::FocusSash | ItemKind::FocusBand)
-        ) {
-            hs.push(ModHandler::new(-40, speed, 8));
+        if let Some(p) = self
+            .mon(t)
+            .item
+            .and_then(|i| self.dex.item_handlers[i as usize].priority(ev, Role::Own))
+        {
+            hs.push(ModHandler::new(p, speed, 8));
         }
         if self.mon(t).vol.endure {
-            hs.push(ModHandler::new(-10, speed, 2));
+            if let Some(p) = self.dex.condition_priority("endure", ev, Role::Own) {
+                hs.push(ModHandler::new(p, speed, 2));
+            }
         }
         // A suppressed Damp (Gastro Acid) still sorts; it's skipped when run.
-        for p in self.all_active() {
-            if self.mon(p).hp > 0 && self.raw_ability_kind(p) == AbilityKind::Damp {
-                hs.push(ModHandler::new(0, self.mon(p).speed, 7));
+        for q in self.all_active() {
+            if self.mon(q).hp > 0 {
+                if let Some(p) =
+                    self.dex.ability_handlers[self.mon(q).ability as usize].priority(ev, Role::Any)
+                {
+                    hs.push(ModHandler::new(p, self.mon(q).speed, 7));
+                }
             }
         }
         if hs.len() > 1 {

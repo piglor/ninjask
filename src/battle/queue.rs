@@ -472,10 +472,11 @@ impl Battle {
         if let Some(t) = &mut self.rng.trace {
             let at = std::panic::Location::caller();
             t.push(format!(
-                "# sort {} @ {}:{}",
+                "# sort {} @ {}:{} of {}",
                 list.len(),
                 at.file(),
-                at.line()
+                at.line(),
+                std::any::type_name::<T>()
             ));
         }
         if list.len() < 2 {

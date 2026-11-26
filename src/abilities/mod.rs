@@ -754,11 +754,20 @@ impl Battle {
         } else {
             0
         };
-        if extra.len() + immunity_vols + self.event_handler_bound(event, target, source) < 2 {
+        // The conditions of the dex with a handler for the event that are in force: the field's
+        // weather and pseudo-weathers (no speed, subOrder 5), the side's and the Pokémon's status.
+        let conditions = self.condition_handlers(event, target);
+        if extra.len()
+            + immunity_vols
+            + conditions.len()
+            + self.event_handler_bound(event, target, source)
+            < 2
+        {
             return;
         }
         let mut hs: ArrayVec<ModHandler, MAX_SORTED_HANDLERS> = ArrayVec::new();
         hs.extend(extra.iter().copied());
+        hs.extend(conditions);
         // Immunity: the target's volatiles with an onImmunity handler (Magnet
         // Rise, and Dig or Dive while charging), in the order they were added.
         if event == Event::Immunity {
@@ -794,6 +803,39 @@ impl Battle {
         if hs.len() > 1 {
             self.speed_sort_by(&mut hs, compare_mod);
         }
+    }
+
+    /// The handlers of the dex's conditions that are in force and have one for `event`, for the
+    /// events `event_sort` stands for: Gravity (`ModifyAccuracy`), the Sun (`Immunity`) and
+    /// paralysis and Tailwind (`ModifySpe`). The presence is the engine's state, the priority and
+    /// whether there is a handler at all the dex's. Each holds a place in Showdown's list and ties
+    /// with nothing of another subOrder, but it is in the `len` of every shuffle.
+    fn condition_handlers(&self, event: Event, target: MonRef) -> ArrayVec<ModHandler, 2> {
+        use crate::dex::events::Role;
+        let mut out = ArrayVec::new();
+        let m = self.mon(target);
+        let mut push = |id: &str, speed: i32, sub: u32, on: bool| {
+            if on {
+                if let Some(p) = self.dex.condition_priority(id, event, Role::Own) {
+                    out.push(ModHandler::new(p, speed, sub));
+                }
+            }
+        };
+        match event {
+            Event::ModifyAccuracy => push("gravity", 0, 5, self.field.gravity > 0),
+            Event::Immunity => push(
+                "sunnyday",
+                0,
+                5,
+                self.field.weather == Some(crate::state::Weather::Sun),
+            ),
+            Event::ModifySpe => {
+                push("par", m.speed, 0, m.status == Status::Par);
+                push("tailwind", 0, 4, self.sides[target.0].conds.tailwind > 0);
+            }
+            _ => {}
+        }
+        out
     }
 
     /// An upper bound on the ability and item handlers `event_sort`
@@ -901,6 +943,18 @@ impl Battle {
         }
         if matches!(self.field.terrain, Some(Terrain::Misty | Terrain::Electric)) {
             hs.push((ModHandler::new(0, 0, 0), None));
+        }
+        // Safeguard (a side condition, subOrder 4) and the target's Focus Punch volatile are in
+        // the list too: the engine applies them where it adds the volatile, but they sort here.
+        if self.side_extras[t.0].safeguard > 0 {
+            if let Some(p) = self.dex.condition_priority("safeguard", event, Role::Own) {
+                hs.push((ModHandler::new(p, 0, 4), None));
+            }
+        }
+        if self.mon(t).vol.focus_punch.is_some() {
+            if let Some(p) = self.dex.condition_priority("focuspunch", event, Role::Own) {
+                hs.push((ModHandler::new(p, self.mon(t).speed, 2), None));
+            }
         }
         if hs.len() > 1 {
             self.speed_sort_by(&mut hs, |a, b| compare_mod(&a.0, &b.0));

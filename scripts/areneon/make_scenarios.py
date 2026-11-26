@@ -327,6 +327,33 @@ scenarios = [
         "must_contain": ["|-fieldstart|move: Gravity", "|-fieldstart|move: Wonder Room|[of] p2b: Hatterene"],
     },
     {
+        "id": "switchin-already-in-emergency-exit",
+        "purpose": "A switch chosen for a Pokemon that is in by the time its action runs: Stealth Rock takes Golisopod (Emergency Exit) below half on its way in, Showdown asks for a switch in the middle of the switch phase, the player names the Pokemon whose switch is still queued for the other slot, and that queued switch fails with a hint and leaves the slot as it was",
+        "seed": "sodium,0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+        "teams": {
+            "p1": team(mon("Talonflame", FILLER, spe=252), mon("Golisopod", FILLER, ability="Emergency Exit"), mon("Snorlax", FILLER), mon("Clefable", FILLER)),
+            "p2": team(mon("Garchomp", ["Stealth Rock", "Protect", "Swords Dance", "Rest"]), mon("Gengar", ["Night Shade", "Protect", "Swords Dance", "Rest"]),
+                       *fillers("Kingambit", "Incineroar")),
+        },
+        # T1: Golisopod takes a Night Shade, Stealth Rock goes up. T2: Golisopod out for Snorlax.
+        # T3: a double switch, Golisopod in first, Clefable second; then the forced switch names Clefable.
+        "choices": rounds(("move 2, move 2", "move 1, move 1 2"), ("move 2, switch 3", "move 2, move 3"), ("switch 3, switch 4", "move 2, move 3"), ("switch 4", None)),
+        "must_contain": [HINT + "A switch failed because the Pok\u00e9mon trying to switch in is already in."],
+        "must_not_contain": ["|switch|p1b: Golisopod|Golisopod, L50, M|66/154", "|switch|p1b: Golisopod|Golisopod, L50, F|66/154"],
+    },
+    {
+        "id": "stockpile-def-capped",
+        "purpose": "Stockpile used with Defense and Special Defense already at +6: the layers end with less boost than layers, and Showdown's hint (no generation check) comes with the end of the stockpile",
+        "seed": "sodium,0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+        "teams": {
+            "p1": team(mon("Swalot", ["Acid Armor", "Stockpile", "Swallow", "Protect"]), *fillers("Snorlax", "Clefable", "Umbreon")),
+            "p2": team(*fillers("Kingambit", "Incineroar", "Garchomp", "Gengar")),
+        },
+        "choices": rounds(("move 1, move 2", "move 3, move 3"), ("move 1, move 2", "move 3, move 3"), ("move 1, move 2", "move 3, move 3"),
+                          ("move 2, move 2", "move 3, move 3"), ("move 3, move 2", "move 3, move 3")),
+        "must_contain": [HINT + "In Gen 7, Stockpile keeps track of how many times it successfully altered each stat individually."],
+    },
+    {
         "id": "psychicterrain-airborne",
         "purpose": "A priority move at an airborne target under Psychic Terrain gets through: Showdown says the terrain does not protect it",
         "seed": "sodium,0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f",
@@ -349,6 +376,11 @@ scenarios = [
         "must_not_contain": [HINT + "Psychic Terrain doesn't affect airborne Pokémon."],
     },
 ]
+
+
+# Whole battles the mirror and cross fuzz (fuzz_replay.py) found with a different framing of a shuffle: the
+# engine's choices, replayed on Showdown here. `explain_framing.py` says where they differed.
+scenarios += json.loads((HERE / "fuzz_games.json").read_text())
 
 
 def main():

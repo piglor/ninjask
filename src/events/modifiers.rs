@@ -679,13 +679,4 @@ impl Battle {
             _ => None,
         }
     }
-
-    /// Whether the target's ability has an `onSourceModifyDamage` handler
-    /// among the handlers here (it joins the ModifyDamage sort).
-    pub(crate) fn has_source_modify_damage(&self, tgt: MonRef) -> bool {
-        matches!(
-            self.raw_ability_kind(tgt),
-            AbilityKind::PunkRock | AbilityKind::Fluffy
-        )
-    }
 }

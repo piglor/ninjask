@@ -419,7 +419,6 @@ fn chacha20_block(key: &[u8; 32]) -> [u8; 64] {
 }
 
 impl Rng {
-    /// Fast mode: xoshiro256++ from a 64-bit seed.
     /// Replaces the generator with the fast one of `seed` and nothing else:
     /// the draw log and the forced draws stay (a forced draw is still
     /// answered first), as does a trace.
@@ -427,6 +426,7 @@ impl Rng {
         self.gen = Rng::new(seed).gen;
     }
 
+    /// Fast mode: xoshiro256++ from a 64-bit seed.
     pub fn new(seed: u64) -> Rng {
         let mut st = seed;
         let state = [

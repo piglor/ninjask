@@ -366,18 +366,24 @@ impl Channel {
             }
             i += 1;
         }
-        // The rest, with the blank line Showdown writes before the result.
-        let ends = battle.ended
-            && to > start
-            && is_end_line(log[to - 1].render(Viewer::Omniscient))
-            && !(to >= 2 && log[to - 2].render(Viewer::Omniscient) == "|");
-        if ends {
-            self.place(Seg::Log {
-                from: start,
-                to: to - 1,
-            });
+        // The rest, with the blank line Showdown writes before the result (`win()` adds it, wherever
+        // the result comes: a win in the middle of a turn is followed by the end-of-battle effects
+        // that still run, a White Herb restoring a drop for one).
+        let end_at = if battle.ended {
+            (start..to)
+                .rev()
+                .find(|&j| is_end_line(log[j].render(Viewer::Omniscient)))
+        } else {
+            None
+        };
+        let blank_at = end_at.filter(|&j| {
+            // The engine's own log may carry it already.
+            !(j >= 1 && log[j - 1].render(Viewer::Omniscient) == "|")
+        });
+        if let Some(j) = blank_at {
+            self.place(Seg::Log { from: start, to: j });
             self.place(Seg::Entries(vec![LogEntry::Plain("|".into())]));
-            self.place(Seg::Log { from: to - 1, to });
+            self.place(Seg::Log { from: j, to });
         } else {
             self.place(Seg::Log { from: start, to });
         }

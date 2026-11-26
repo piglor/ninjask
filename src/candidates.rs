@@ -411,29 +411,42 @@ fn preview_candidates(request: &Map<String, Value>, team: &[Mon]) -> Result<Vec<
         .collect())
 }
 
-/// A Revival Blessing request (`side.pokemon[i].reviving`): the one flagged
-/// slot names a fainted Pokémon of the side by position, active slots
-/// included, and may pass only when no living bench Pokémon could switch in.
-/// Anything but exactly one flagged, reviving slot fails closed.
+/// A Revival Blessing request (`side.pokemon[i].reviving`): each flagged,
+/// reviving slot names a fainted Pokémon of the side by position, active
+/// slots included, and `pass` is accepted as the engine's two counters allow
+/// (`sim/side.ts` `clearChoice`, `choosePass`): with `n` flagged slots and `b`
+/// living bench Pokémon it starts with `min(n, b)` forced switches and the
+/// remaining `n - min(n, b)` forced passes, a revival uses neither, and a
+/// `pass` uses a forced pass. So one slot may pass only when `b = 0`; two
+/// slots may each pass when `b = 0`, only one of them when `b = 1`, and never
+/// when `b >= 2`. A revival is not a switch-in: both slots may name the same
+/// fainted Pokémon (Showdown accepts it, and heals it twice). Candidates keep
+/// the first slot's options in the outer loop, the second's in the inner one.
+/// Anything but one or two flagged slots that are exactly the reviving ones
+/// fails closed.
 fn revival_candidates(flags: &[bool], team: &[Mon]) -> Result<Vec<Candidate>> {
     let flagged = flags.iter().filter(|f| **f).count();
-    let slot = flags.iter().position(|f| *f);
-    if flagged != 1
-        || team.iter().filter(|m| m.reviving).count() != 1
-        || !slot.is_some_and(|s| team.get(s).is_some_and(|m| m.reviving))
-    {
-        return fail("Revival Blessing outside one flagged reviving slot is not supported");
+    let reviving = team.iter().filter(|m| m.reviving).count();
+    let flags_match = flags
+        .iter()
+        .enumerate()
+        .all(|(i, f)| team.get(i).is_some_and(|m| m.reviving == *f));
+    if !(1..=ACTIVE_SLOTS).contains(&flagged) || reviving != flagged || !flags_match {
+        return fail("Revival Blessing outside the flagged reviving slots is not supported");
     }
-    let mut options: Vec<SlotOption> = team
+    let revivals: Vec<SlotOption> = team
         .iter()
         .enumerate()
         .filter(|(_, m)| m.fainted)
         .map(|(i, _)| SlotOption::plain(format!("switch {}", i + 1), false))
         .collect();
-    if options.is_empty() {
+    if revivals.is_empty() {
         return fail("Revival Blessing request with no fainted Pokémon to revive");
     }
-    if bench_slots(team).is_empty() {
+    let bench = bench_slots(team).len();
+    let passes_allowed = flagged.saturating_sub(flagged.min(bench));
+    let mut options = revivals;
+    if passes_allowed > 0 {
         options.push(SlotOption::plain("pass", false));
     }
     let pass = [SlotOption::plain("pass", false)];
@@ -441,7 +454,11 @@ fn revival_candidates(flags: &[bool], team: &[Mon]) -> Result<Vec<Candidate>> {
         .iter()
         .map(|f| if *f { &options[..] } else { &pass[..] })
         .collect();
-    Ok(joint(per_slot[0], per_slot[1], |_, _| true))
+    // Both slots flagged: a pass in each is one forced pass too many unless two are left.
+    let both_pass_ok = passes_allowed >= 2;
+    Ok(joint(per_slot[0], per_slot[1], |a, b| {
+        flagged < 2 || both_pass_ok || !(a.text == "pass" && b.text == "pass")
+    }))
 }
 
 fn force_switch_candidates(request: &Map<String, Value>, team: &[Mon]) -> Result<Vec<Candidate>> {
@@ -710,6 +727,101 @@ mod tests {
             ]
             .map(String::from)
         );
+    }
+
+    #[test]
+    fn two_reviving_slots_pass_as_the_engines_two_counters_allow() {
+        // Showdown on the pin (N0's oracle `test_two_revivers_request_lists_what_showdown_accepts`):
+        // nine combinations when nobody lives on the bench, a revival is no switch-in, so both slots
+        // may name the same fainted Pokémon.
+        let reviving = |fainted: &[bool]| {
+            let mut s = side(fainted);
+            s["pokemon"][0]["reviving"] = json!(true);
+            s["pokemon"][1]["reviving"] = json!(true);
+            json!({"forceSwitch": [true, true], "side": s})
+        };
+        let none = reviving(&[false, false, true, true]);
+        assert_eq!(
+            choices(&none),
+            [
+                "switch 3, switch 3",
+                "switch 3, switch 4",
+                "switch 3, pass",
+                "switch 4, switch 3",
+                "switch 4, switch 4",
+                "switch 4, pass",
+                "pass, switch 3",
+                "pass, switch 4",
+                "pass, pass",
+            ]
+            .map(String::from)
+        );
+        // One living bench Pokémon: a single forced pass, so one slot may pass, not both.
+        let one = reviving(&[false, false, true, false]);
+        assert_eq!(
+            choices(&one),
+            ["switch 3, switch 3", "switch 3, pass", "pass, switch 3"].map(String::from)
+        );
+        // Two or more: both revive.
+        let two = reviving(&[false, false, true, false, false, true]);
+        assert_eq!(
+            choices(&two),
+            [
+                "switch 3, switch 3",
+                "switch 3, switch 6",
+                "switch 6, switch 3",
+                "switch 6, switch 6"
+            ]
+            .map(String::from)
+        );
+        // Only one of two forced slots reviving, a flag with no reviver, a reviver with no flag,
+        // a reviver off the active slots, and no fainted Pokémon all fail closed.
+        let mut half = side(&[false, false, true, true]);
+        half["pokemon"][0]["reviving"] = json!(true);
+        assert!(
+            candidates_from_request(&json!({"forceSwitch": [true, true], "side": half})).is_err()
+        );
+        let mut unflagged = side(&[false, false, true, true]);
+        unflagged["pokemon"][0]["reviving"] = json!(true);
+        unflagged["pokemon"][1]["reviving"] = json!(true);
+        assert!(
+            candidates_from_request(&json!({"forceSwitch": [true, false], "side": unflagged}))
+                .is_err()
+        );
+        let mut elsewhere = side(&[false, false, true, true]);
+        elsewhere["pokemon"][0]["reviving"] = json!(true);
+        elsewhere["pokemon"][3]["reviving"] = json!(true);
+        assert!(
+            candidates_from_request(&json!({"forceSwitch": [true, false], "side": elsewhere}))
+                .is_err()
+        );
+        let alive = reviving(&[false; 4]);
+        assert!(candidates_from_request(&alive).is_err());
+    }
+
+    /// The pinned Showdown's own answer: `tests/fixtures/areneon/two-revivers.json` holds the request of
+    /// a side with two reviving slots (reached by play: no Pokémon lives on the bench; and with one
+    /// fainted bench Pokémon made alive by hand) and every combination `Side.choose` accepted there
+    /// (`scripts/areneon/revival_probe.cjs`).
+    #[test]
+    fn two_reviving_slots_equal_what_showdown_accepts() {
+        let fixture: Value =
+            serde_json::from_str(include_str!("../tests/fixtures/areneon/two-revivers.json"))
+                .unwrap();
+        let cases = fixture["output"].as_array().unwrap();
+        assert_eq!(cases.len(), 2);
+        for case in cases {
+            let accepted: Vec<String> = case["accepted"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|c| c.as_str().unwrap().to_string())
+                .collect();
+            assert!(!accepted.is_empty());
+            assert_eq!(choices(&case["request"]), accepted);
+        }
+        assert_eq!(cases[0]["accepted"].as_array().unwrap().len(), 9);
+        assert_eq!(cases[1]["accepted"].as_array().unwrap().len(), 3);
     }
 
     #[test]

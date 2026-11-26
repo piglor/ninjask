@@ -9,6 +9,7 @@ mod transfer;
 use crate::abilities::{compare_mod, ModHandler};
 use crate::battle::Small;
 use crate::battle::{Battle, MonRef};
+use crate::dex::events::{Event, Role};
 use crate::dex::types::*;
 use crate::dex::Move;
 use crate::kinds::{AbilityKind, EffectRef, ItemKind};
@@ -28,8 +29,11 @@ enum DamageModHandler {
     GlaiveRush,
     /// The target's Minimize volatile (`onSourceModifyDamage`).
     Minimize,
-    /// The target's ability: Multiscale, Filter, Aura Guard.
+    /// The target's ability: Multiscale, Filter, Aura Guard, Punk Rock, Fluffy.
     TargetAbility,
+    /// A handler of the format's data that this chain has nothing to do for (Ripen's own is
+    /// applied after the berry): it is in Showdown's sort, so it is in this one.
+    Inert,
     /// The target's Fly, Dig or Dive volatile (`onSourceModifyDamage`).
     SemiInvulnerable,
     ResistBerry,
@@ -117,11 +121,7 @@ impl Battle {
 
     /// Whether an item has a switch-in (`onStart`) effect, and its priority.
     pub(crate) fn item_switch_in_priority(&self, r: MonRef) -> Option<i32> {
-        match self.item_kind(r)? {
-            ItemKind::Seed(_) => Some(-1),
-            ItemKind::AirBalloon | ItemKind::Metronome => Some(0),
-            _ => None,
-        }
+        switch_in_priority_of_item(self.item_kind(r)?)
     }
 
     /// An item's `onStart` at switch-in: `singleEvent('SwitchIn')`, which
@@ -365,20 +365,40 @@ impl Battle {
     ) -> Chain {
         use DamageModHandler as H;
         let key = |speed: i32, sub_order: u32| ModHandler::new(0, speed, sub_order);
-        let mut hs: arrayvec::ArrayVec<(H, ModHandler), 32> = arrayvec::ArrayVec::new();
+        let mut hs: arrayvec::ArrayVec<(H, ModHandler), 40> = arrayvec::ArrayVec::new();
         let speed = self.mon(src).speed;
         if self.mon(src).vol.metronome.is_some() {
             hs.push((H::Metronome, key(speed, 2)));
         }
-        if self.raw_ability_kind(src) == AbilityKind::Sniper {
-            hs.push((H::Sniper, key(speed, 7)));
+        // Every handler of the event that the dex's tables give an ability or an item joins the
+        // sort, whether or not this chain has anything to do for it (the tie draws are
+        // `shuffle(len, ...)`, and `len` is the whole list).
+        let ev = Event::ModifyDamage;
+        let ability_p = |b: &Battle, r: MonRef, role: Role| {
+            b.dex.ability_handlers[b.mon(r).ability as usize].priority(ev, role)
+        };
+        let item_p = |b: &Battle, r: MonRef, role: Role| {
+            b.mon(r)
+                .item
+                .and_then(|i| b.dex.item_handlers[i as usize].priority(ev, role))
+        };
+        if let Some(p) = ability_p(self, src, Role::Own) {
+            let tag = if self.raw_ability_kind(src) == AbilityKind::Sniper {
+                H::Sniper
+            } else {
+                H::Inert
+            };
+            hs.push((tag, ModHandler::new(p, speed, 7)));
         }
         // Items are collected even while ignored (Magic Room, Klutz), and
         // checked when they run.
-        match self.raw_item_kind(src) {
-            Some(ItemKind::LifeOrb) => hs.push((H::LifeOrb, key(speed, 8))),
-            Some(ItemKind::ExpertBelt) => hs.push((H::ExpertBelt, key(speed, 8))),
-            _ => {}
+        if let Some(p) = item_p(self, src, Role::Own) {
+            let tag = match self.raw_item_kind(src) {
+                Some(ItemKind::LifeOrb) => H::LifeOrb,
+                Some(ItemKind::ExpertBelt) => H::ExpertBelt,
+                _ => H::Inert,
+            };
+            hs.push((tag, ModHandler::new(p, speed, 8)));
         }
         let mut around: arrayvec::ArrayVec<MonRef, 8> = arrayvec::ArrayVec::new();
         for s in [src.0, 1 - src.0] {
@@ -389,8 +409,22 @@ impl Battle {
             );
         }
         for r in around {
-            if self.raw_ability_kind(r) == AbilityKind::FriendGuard {
-                hs.push((H::FriendGuard(r), key(self.mon(r).speed, 7)));
+            let role = if r.0 == src.0 { Role::Ally } else { Role::Foe };
+            let sp = self.mon(r).speed;
+            for role in [role, Role::Any] {
+                if let Some(p) = ability_p(self, r, role) {
+                    let tag = if role == Role::Any
+                        && self.raw_ability_kind(r) == AbilityKind::FriendGuard
+                    {
+                        H::FriendGuard(r)
+                    } else {
+                        H::Inert
+                    };
+                    hs.push((tag, ModHandler::new(p, sp, 7)));
+                }
+                if let Some(p) = item_p(self, r, role) {
+                    hs.push((H::Inert, ModHandler::new(p, sp, 8)));
+                }
             }
         }
         let speed = self.mon(tgt).speed;
@@ -403,15 +437,21 @@ impl Battle {
         if self.semi_invulnerable_source_modify_damage(tgt) {
             hs.push((H::SemiInvulnerable, key(speed, 2)));
         }
-        if matches!(
-            self.raw_ability_kind(tgt),
-            AbilityKind::Multiscale | AbilityKind::Filter | AbilityKind::AuraGuard
-        ) || self.has_source_modify_damage(tgt)
-        {
-            hs.push((H::TargetAbility, key(speed, 7)));
+        if let Some(p) = ability_p(self, tgt, Role::Source) {
+            let tag = if self.raw_ability_kind(tgt) == AbilityKind::Ripen {
+                H::Inert
+            } else {
+                H::TargetAbility
+            };
+            hs.push((tag, ModHandler::new(p, speed, 7)));
         }
-        if matches!(self.raw_item_kind(tgt), Some(ItemKind::ResistBerry(_))) {
-            hs.push((H::ResistBerry, key(speed, 8)));
+        if let Some(p) = item_p(self, tgt, Role::Source) {
+            let tag = if matches!(self.raw_item_kind(tgt), Some(ItemKind::ResistBerry(_))) {
+                H::ResistBerry
+            } else {
+                H::Inert
+            };
+            hs.push((tag, ModHandler::new(p, speed, 8)));
         }
         for s in 0..2 {
             for c in self.sides[s].conds.in_order() {
@@ -610,5 +650,15 @@ impl Battle {
             // A delayed hit never ran ModifyMove.
             && !mv.has(MoveFlag::FutureMove)
             && !mv.secondaries.iter().any(|s| s.volatile.as_deref() == Some("flinch"))
+    }
+}
+
+/// The priority the engine gives an item it acts on at switch-in (`None` for one it does not): the
+/// sort takes its list and priorities from the dex (`Event::SwitchIn`), and a test holds this to it.
+pub(crate) fn switch_in_priority_of_item(kind: ItemKind) -> Option<i32> {
+    match kind {
+        ItemKind::Seed(_) => Some(-1),
+        ItemKind::AirBalloon | ItemKind::Metronome => Some(0),
+        _ => None,
     }
 }
