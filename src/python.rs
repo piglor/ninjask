@@ -1279,6 +1279,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyBattle>()?;
     m.add_class::<PyTracker>()?;
     m.add_class::<PyBatch>()?;
+    m.add_class::<crate::declared::python::PyProber>()?;
     m.add("SHOWDOWN_COMMIT", crate::SHOWDOWN_COMMIT)?;
     m.add("ACTION_WIDTH", crate::batch::ACTION_WIDTH)?;
     m.add("DEFAULT_MAX_PATHS", crate::DEFAULT_MAX_PATHS)?;

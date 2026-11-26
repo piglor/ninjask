@@ -65,6 +65,7 @@ pub mod calc;
 pub mod candidates;
 pub mod channel;
 pub mod conditions;
+pub mod declared;
 pub mod dex;
 pub mod encode;
 pub mod events;

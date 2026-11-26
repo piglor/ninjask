@@ -325,3 +325,12 @@ class Batch:
     def turn(self, i: int) -> int: ...
     def battle(self, i: int) -> Battle:
         """A copy of battle `i`."""
+
+
+class Prober:
+    """The declared-state layer (`ninjask.declared`): answers Areneon's mechanics-probe queries (`damage`, `speed_order`,
+    `stats`) from this engine's calculators over a scenario battle it builds from declared sets and an absolute declared state.
+    `serve` takes one request frame (JSON bytes: ops `sets`, `blockers`, `batch`, `counts`) and returns the response frame."""
+
+    def __init__(self, dex: Dex) -> None: ...
+    def serve(self, frame: bytes) -> bytes: ...

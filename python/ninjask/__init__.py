@@ -32,6 +32,7 @@ if TYPE_CHECKING:
         Dex,
         EnumerationMode,
         Outcome,
+        Prober,
         Tracker,
     )
 else:
@@ -39,6 +40,8 @@ else:
     Battle = _compiled.Battle
     Tracker = _compiled.Tracker
     Batch = _compiled.Batch
+    # An extension that predates the declared-state layer has no Prober.
+    Prober = getattr(_compiled, "Prober", None)
     # Layouts of Tracker.encode(), encode_ids(), Battle.legal_actions() and
     # Batch.observe() (ninjask::encode).
     # The Pokémon Showdown commit the engine is a port of (refsim/SHOWDOWN_COMMIT).
@@ -73,6 +76,7 @@ __all__ = [
     "OBS_LEN",
     "Outcome",
     "Policy",
+    "Prober",
     "SHOWDOWN_COMMIT",
     "TEAMS_DIR",
     "TURN_LIMIT",
