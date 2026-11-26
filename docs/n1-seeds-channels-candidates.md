@@ -268,7 +268,7 @@ battle, 45,631 handler lists, 9,667 of them tie-capable, and all 9,667 have an e
 length. The tool found, before the lists below were completed, SwitchIn lists without Choice Scarf and
 Metronome, and the fuzz found the Damage, TryHit, TryHeal and BeforeMove lists.
 
-Lists built from the dex tables (`Event::ALL`, 29 events, `tests/fixtures/areneon/handler-sets.json` holds
+Lists built from the dex tables (`Event::ALL`, 30 events, `tests/fixtures/areneon/handler-sets.json` holds 31 (the 30 and `Start`) and
 what each has per kind and role and `test_n1_handlers.py` holds it to the export): the abilities and items of
 ModifyMove, Update, Damage, TryHit (side moves), TryHeal, SwitchIn (an `onStart` is the SwitchIn handler of an
 ability or item, at its `onSwitchInPriority`: `getCallback`), ModifyDamage, DisableMove, trapping and the
@@ -307,8 +307,14 @@ draw.
 
 ## Evidence
 
-Run on the final code, on top of the pin sync (`d5db5b8`), with the scripts of
-`scripts/areneon/README.md` (the numbers are of the run reported on PR #1):
+Which run was on which commit. The scripts are those of `scripts/areneon/README.md`; none of the runs below is in CI.
+
+- **Before the merge of fork `main` (N0 hardening, N3 probes)**, on the tree of commit `f68ec30` plus the review fixes (the first commit of PR #1 after it): the 3,200 recorded battles, 11,000 fresh battles (5,500 mirror from seed 900000 and 5,500 cross from 950000), 146,352 requests against Areneon's TypeScript `enumerateCandidates`, and the 104,318 requests of 3,600 battles judged by the engine.
+- **After the merge, head `afa2b64`**: the 3,200 recorded battles again, 3,000 fresh battles (1,500 mirror and 1,500 cross, the same base seeds), 40,386 requests against the TypeScript enumerator (1,000 requests' dump), the sorted-list check on those 3,000 battles, pytest, clippy and the fingerprint.
+- **Not repeated after the merge**: the 11,000-battle run, the 146,352 requests, and the engine-judged run of 3,600 battles (104,318 requests).
+- **In CI** (the `checks` and `fidelity` jobs): fmt, clippy, `cargo test`, the fingerprint, the reference checks, pytest. **Not in CI**: the large fresh-battle runs (`fuzz_replay.py`), the sorted-list check (`sort_sequence.py`), the comparison with the TypeScript enumerator, the engine-judged run (`test_n1_fresh.py` is skipped unless `NINJASK_N1_BATTLES` is set) and the hint-scenario recorder; they need a Showdown checkout and an Areneon checkout and are run by hand.
+
+Numbers in the table are those of the pre-merge runs unless a row says otherwise.
 
 | Check | Result |
 |---|---|
@@ -317,7 +323,7 @@ Run on the final code, on top of the pin sync (`d5db5b8`), with the scripts of
 | both channels and the omniscient log, line for line | 3,200 of 3,200 equal (3,191 before the pin sync and the hints) |
 | the engine's draws against Showdown's, call for call | 3,200 of 3,200 equal (3,198 before the sorted lists) |
 | forced replay on the fast generator (game and channels equal Showdown's) | 3,200 of 3,200 equal (3,189 before) |
-| 146,352 fresh requests (3,600 battles, random candidates incl. pending) against Areneon's `enumerateCandidates` (TypeScript, same request text) | 146,352 equal, 0 differ, 0 refused by the reference's schema; 13,243,850 candidates, 59,673 pending |
+| 146,352 fresh requests (3,600 battles, random candidates incl. pending) against Areneon's `enumerateCandidates` (TypeScript, same request text) | 146,352 equal (40,386 of 40,386 on the merged head), 0 differ, 0 refused by the reference's schema; 13,243,850 candidates, 59,673 pending |
 | fresh battles judged by the engine (brute force over every syntactic choice string) | 104,318 requests of 3,600 battles: no non-pending candidate refused by the engine; 11,062 pending candidates refused, all as `[Unavailable choice]` and each followed by a changed request; 2,607 requests brute-forced over every syntactic choice string of their phase, no accepted action missing |
 | `examples/fingerprint` (2,000 fixture games), against `origin/main` | logs: +116 hint lines; requests: equal; the numbers drawn: equal (the draws hash with the `sort` trace entries left out is `1269806311788d01` on both); the draws entry of the fingerprint moves only by 651 `# sort` trace entries (877,797 to 878,448 entries), the completed handler lists of the sorted `ModifyMove` and `Update` events; `c826ee9bb327b2d8` to `91fb64fa6e58900a` |
-| 25 hand-built hint scenarios and the two gap battles, channels and draws | 27 of 27 equal (5 differed in channels and 1 in draws, and both gap battles in draws, before the fixes) |
+| 34 hand-built scenarios (the hint audit's, with their controls and the later additions: 34 rows in `scenarios.jsonl.gz`) and the two gap battles, channels and draws | 36 of 36 equal (5 differed in channels and 1 in draws, and both gap battles in draws, before the fixes) |

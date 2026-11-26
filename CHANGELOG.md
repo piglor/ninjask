@@ -5,8 +5,8 @@
 Fork changes for a training harness (Areneon, ticket #1532): Showdown seeds in
 `Batch`, per-player channels, candidates and the draw log. See
 `docs/n1-seeds-channels-candidates.md`. Games play as before (the same draws
-in the same order for every seed); logs gain ten `|-hint|` lines Showdown
-prints, so `examples/fingerprint` moves from `c826ee9bb327b2d8` to
+in the same order for every seed); logs gain `|-hint|` lines Showdown
+prints (twelve of the seventeen places a Reg M-C battle can reach), so `examples/fingerprint` moves from `c826ee9bb327b2d8` to
 `91fb64fa6e58900a` (logs +116 hint lines; the numbers drawn are equal, the draws entry gains 651
 `sort` trace entries of the completed sorted lists).
 
@@ -57,7 +57,7 @@ The entries on the loader, `NINJASK_EXTENSION`, `PROVENANCE.json` schema 2 and t
 
 - Five sites that drew `random(n)` directly call the method Showdown calls
   (`sample`, `randomChance`): the numbers drawn are unchanged.
-- The engine's log carries ten `|-hint|` lines it omitted, the places of an audit
+- The engine's log carries `|-hint|` lines it omitted (twelve of seventeen places), the places of an audit
   of every hint call site of the pin (`docs/n1-seeds-channels-candidates.md`,
   "Hint audit"): Skill Swap between allies, Future Sight that does not hit, Dark's
   immunity to Prankster, Rising Voltage on a grounded target, Psychic Terrain not
@@ -66,9 +66,9 @@ The entries on the loader, `NINJASK_EXTENSION`, `PROVENANCE.json` schema 2 and t
   Future Sight from turn 253 and Wish on turn 256. The fingerprint's log hash changes.
   The fingerprint's three parts on the 2,000 fixture games: the logs differ by 116 hint lines
   (`9489572e7e8eb387` to `a601ff69e464a335`), the requests are equal (`905e08f88638ebee`), and the
-  draws entry moves because the extended lists below add 64 `# sort` trace entries; the numbers
-  drawn are equal (the same 258,916 draws, one hash `a9f7e8785643537e` before and after, checked
-  with a copy of the example that skips the sort entries).
+  draws entry moves because the extended lists below add 651 `# sort` trace entries (877,797 to 878,448 on the 2,000 fixture games); the numbers
+  drawn are equal: `examples/fingerprint -- ... --skip-sort-entries` prints the draws hash
+  `1269806311788d01` on `main` and on this branch (`tests/fingerprint_flag.rs`).
 - The sorted `ModifyMove` and `Update` handler lists include the handlers Showdown
   collects and the engine ran elsewhere (the user's ability and item, its freeze), as
   the engine's other sorted lists do; the numbers drawn are unchanged, the framing of

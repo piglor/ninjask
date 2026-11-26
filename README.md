@@ -420,7 +420,10 @@ cargo run --release --example fingerprint -- data/derived/format/gen9championsvg
 ```
 
 On the bundled fixture teams (`tests/fixtures/regmc_teams.txt`) the fingerprint is
-`91fb64fa6e58900a`. A change that preserves behaviour must leave it unchanged.
+`91fb64fa6e58900a`. A change that preserves behaviour must leave it unchanged. With
+`--skip-sort-entries` the draws entry leaves the `# sort` trace entries out (`1269806311788d01` on the
+fixture teams, equal on `main` and on the N1 branch): it tells a change that only completes a sorted
+list from one that moves a draw.
 
 The bench plays random legal games on one thread with logging off: about
 5,400 to 6,700 games/s over ten runs on one core of a 4-vCPU cloud VM (Xeon
